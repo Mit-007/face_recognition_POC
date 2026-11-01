@@ -1,0 +1,139 @@
+# ==========================================
+# Face Recognition POC - Git Ignore Configuration
+# ==========================================
+
+# ------------------------------------------
+# Environment & Secrets
+# ------------------------------------------
+.env
+.env.*
+*.env
+!.env.example
+!.env.template
+
+# ------------------------------------------
+# Python Virtual Environments
+# ------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ------------------------------------------
+# Python Bytecode & Cache
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing & Linting caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# Python packaging & distribution
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ------------------------------------------
+# Backend Runtime & Uploaded Data
+# ------------------------------------------
+# Ignore dynamically uploaded face registration images, but track folder
+backend/database_images/*
+!backend/database_images/.gitkeep
+
+# ------------------------------------------
+# Logs
+# ------------------------------------------
+*.log
+logs/
+backend/server.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------
+# Node / Frontend (React + Vite)
+# ------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ------------------------------------------
+# Model Weights & Checkpoints (Local downloads)
+# ------------------------------------------
+*.onnx
+*.pt
+*.pth
+*.bin
+*.h5
+*.tflite
+models/
+
+# ------------------------------------------
+# Large Media & Video Recordings
+# ------------------------------------------
+# Video screen recordings / large test media (e.g., POC demo videos)
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# ------------------------------------------
+# Operating System Files
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------
+# IDE & Editor Files
+# ------------------------------------------
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.bak
+*.orig

@@ -1,0 +1,341 @@
+/* ---------- Page shell ---------- */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.app {
+  flex: 1;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 18px 20px;
+  font-size: 12px;
+  color: #9aa1ac;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- Navbar ---------- */
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.brand-tagline {
+  font-size: 11px;
+  color: var(--text);
+  margin: 0;
+}
+
+.navbar-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.navbar-tabs button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.navbar-tabs button:hover {
+  color: var(--text-h);
+}
+
+.navbar-tabs button.active {
+  background: var(--accent);
+  color: white;
+}
+
+@media (max-width: 520px) {
+  .navbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .navbar-tabs {
+    justify-content: stretch;
+  }
+  .navbar-tabs button {
+    flex: 1;
+  }
+}
+
+/* ---------- Card / form ---------- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.card .subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+  margin-top: -14px;
+  margin-bottom: 4px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.field > span {
+  font-weight: 500;
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.field input[type="text"] {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  background: #fff;
+  color: var(--text-h);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+/* ---------- Submit button ---------- */
+
+button[type="submit"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button[type="submit"]:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button[type="submit"]:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Status banners ---------- */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.status svg {
+  flex-shrink: 0;
+}
+
+.status.success {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.status.error {
+  color: var(--error);
+  background: var(--error-bg);
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.matched-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+/* ---------- Camera ---------- */
+
+.camera-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  background: #fafbfc;
+}
+
+.camera-live,
+.camera-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.camera-frame {
+  position: relative;
+  width: 100%;
+}
+
+.camera-live video,
+.camera-preview img {
+  width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #000;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-live video {
+  transform: scaleX(-1);
+}
+
+.camera-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56%;
+  height: 76%;
+  transform: translate(-50%, -50%);
+  border: 2px dashed rgba(255, 255, 255, 0.75);
+  border-radius: 50% / 40%;
+  pointer-events: none;
+}
+
+.camera-hint {
+  font-size: 12px;
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+}
+
+.camera-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.camera-btn:hover {
+  background: var(--accent-hover);
+}
+
+.camera-btn.secondary {
+  background: #fff;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.camera-btn.secondary:hover {
+  background: var(--accent-bg);
+}
