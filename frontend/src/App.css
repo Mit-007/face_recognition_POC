@@ -311,12 +311,30 @@ button[type="submit"]:disabled {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 56%;
-  height: 76%;
+  height: 88%;
+  aspect-ratio: 3 / 4;
   transform: translate(-50%, -50%);
   border: 2px dashed rgba(255, 255, 255, 0.75);
   border-radius: 50% / 40%;
   pointer-events: none;
+}
+
+.camera-guide-eye {
+  position: absolute;
+  top: 38%;
+  width: 16%;
+  aspect-ratio: 2 / 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+}
+
+.camera-guide-eye.left {
+  left: 32%;
+}
+
+.camera-guide-eye.right {
+  left: 68%;
 }
 
 .camera-hint {
@@ -448,71 +466,6 @@ button[type="submit"]:disabled {
   margin-top: 4px;
 }
 
-/* ---------- Threshold Controls ---------- */
-
-.threshold-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: #f1f5f9;
-  border: 1px solid var(--border);
-  padding: 12px 14px;
-  border-radius: 10px;
-}
-
-.threshold-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.threshold-val {
-  font-family: monospace;
-  font-size: 13px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  padding: 2px 7px;
-  border-radius: 5px;
-}
-
-.threshold-box input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.threshold-hints {
-  display: flex;
-  gap: 6px;
-}
-
-.chip {
-  flex: 1;
-  padding: 4px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  border: 1px solid var(--border);
-  background: #ffffff;
-  border-radius: 6px;
-  color: var(--text);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #ffffff;
-}
-
 /* ---------- Biometric Verification Card ---------- */
 
 .verification-card {
@@ -614,10 +567,6 @@ button[type="submit"]:disabled {
   background: #e2e8f0;
   border-radius: 6px;
   overflow: hidden;
-}
-
-.meter-track.small {
-  height: 6px;
 }
 
 .meter-bar {
@@ -1121,16 +1070,6 @@ button[type="submit"]:disabled {
   color: #94a3b8;
 }
 
-.table-latency-tag {
-  font-family: monospace;
-  font-size: 11px;
-  color: #64748b;
-  background: #f1f5f9;
-  padding: 3px 7px;
-  border-radius: 5px;
-  white-space: nowrap;
-}
-
 /* Empty & Loading States */
 
 .history-empty,
@@ -1165,12 +1104,6 @@ button[type="submit"]:disabled {
 }
 
 /* ---------- REGISTERED USERS SECTION (ON REGISTER PAGE) ---------- */
-
-.register-page-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
 
 .registered-users-card {
   max-width: 100%;
@@ -1307,5 +1240,106 @@ button[type="submit"]:disabled {
 .users-empty p {
   font-size: 12.5px;
   max-width: 280px;
+}
+
+/* ---------- Classical Distance Chips ---------- */
+
+.classical-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.classical-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: #334155;
+  font-family: monospace;
+}
+
+.classical-chip strong {
+  color: #0f172a;
+}
+
+/* Ranked Candidates List */
+.ranking-section {
+  margin-top: 16px;
+  border-top: 1px dashed var(--border);
+  padding-top: 14px;
+}
+
+.ranking-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 8px;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.ranking-rank {
+  font-weight: 700;
+  color: var(--accent);
+  width: 20px;
+}
+
+.ranking-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.ranking-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.ranking-name {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.ranking-metrics {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: monospace;
+  font-size: 11.5px;
+}
+
+.ranking-dist {
+  color: #64748b;
+}
+
+.ranking-score {
+  font-weight: 700;
+  color: #10b981;
 }
 

@@ -90,8 +90,9 @@ export default function RegisterPerson({ onNavigateUsers }) {
           <div className="register-guidelines">
             <span className="guidelines-title">Enrollment Checklist:</span>
             <ul>
-              <li>Face centered in frame</li>
-              <li>Good frontal lighting (no harsh shadows)</li>
+              <li>Only one person in the photo, looking straight at the camera</li>
+              <li>Face fills the outline with eyes on the two marks</li>
+              <li>Even light on both sides of the face, not too dark or too bright</li>
               <li>Remove dark sunglasses or face masks</li>
             </ul>
           </div>

@@ -1,0 +1,977 @@
+{
+  "each_approach": [
+    {
+      "genuine_pairs": 4,
+      "impostor_pairs": 6,
+      "genuine_range": [
+        0.1092,
+        0.2421
+      ],
+      "impostor_range": [
+        0.0834,
+        0.207
+      ],
+      "ranges_overlap": true,
+      "auc": 0.3333333333333333,
+      "eer": 0.5,
+      "eer_threshold": 0.1393,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 5,
+        "closest_correct": 0.4,
+        "correctly_accepted": 0.4,
+        "unknown_probes": 5,
+        "unknown_accepted": 0.6
+      },
+      "name": "before_change",
+      "description": "Old pipeline, for comparison: Haar box crop and whole-image blur check",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\2.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 0.8,
+      "describe_ms": 171.73338333183588,
+      "compare_ms": 0.030520001018885523,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 231.68359375
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0875,
+        0.1191
+      ],
+      "impostor_range": [
+        0.0721,
+        0.1166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.0859,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "eye_align_only",
+      "description": "New eye alignment without the photo quality checks",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 136.6621000027711,
+      "compare_ms": 0.04014999770636981,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.515625
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0875,
+        0.1191
+      ],
+      "impostor_range": [
+        0.0721,
+        0.1166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.0859,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "app_cutoff": {
+        "cutoff": 0.22,
+        "far": 1.0,
+        "frr": 0.0,
+        "identification": {
+          "known_probes": 4,
+          "closest_correct": 0.0,
+          "correctly_accepted": 0.0,
+          "unknown_probes": 4,
+          "unknown_accepted": 1.0
+        }
+      },
+      "name": "current_app",
+      "description": "The code the app runs today: photo checks, eye alignment, 0.6 LBP + 0.4 HOG",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 1,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 140.80486666838019,
+      "compare_ms": 0.03956666720720629,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.80859375
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.08950741589069366,
+        0.12589214742183685
+      ],
+      "impostor_range": [
+        0.07334430515766144,
+        0.12228874117136002
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.08734752982854843,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "lbp_only",
+      "description": "LBP texture alone",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 163.176483331578,
+      "compare_ms": 0.04778333338132749,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 219.05859375
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.08449840545654297,
+        0.10883128643035889
+      ],
+      "impostor_range": [
+        0.07020312547683716,
+        0.10794240236282349
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.5,
+      "eer_threshold": 0.08449840545654297,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "hog_only",
+      "description": "HOG shape alone",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 148.92451666673878,
+      "compare_ms": 0.0598666665609926,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.578125
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.09391441196203232,
+        0.11318766474723815
+      ],
+      "impostor_range": [
+        0.06017294526100159,
+        0.12590453773736954
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.875,
+      "eer_threshold": 0.08126179352402688,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "inner_crop_80",
+      "description": "Central 80% of the face, less hair and background",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 143.1372333293742,
+      "compare_ms": 0.045366665290202945,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.98046875
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.09084546715021133,
+        0.11631974577903748
+      ],
+      "impostor_range": [
+        0.07826895713806152,
+        0.11575864702463151
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.5,
+      "eer_threshold": 0.09084546715021133,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.25,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.5
+      },
+      "name": "multiscale_lbp",
+      "description": "LBP at radius 1, 2, and 3",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 148.99001666587233,
+      "compare_ms": 0.06704999880942826,
+      "feature_kb": 9.5,
+      "peak_memory_mb": 218.953125
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0722217470407486,
+        0.09565854221582412
+      ],
+      "impostor_range": [
+        0.05953678265213966,
+        0.09586984217166901
+      ],
+      "ranges_overlap": true,
+      "auc": 0.375,
+      "eer": 0.5,
+      "eer_threshold": 0.0722217470407486,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "region_weighted",
+      "description": "More LBP weight on eyes, nose, and mouth",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 141.07678332948126,
+      "compare_ms": 0.043066664754102625,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.91796875
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.17812256515026093,
+        0.20496157705783846
+      ],
+      "impostor_range": [
+        0.15003323256969453,
+        0.21424300521612166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.875,
+      "eer_threshold": 0.1673166409134865,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "finer_hog",
+      "description": "HOG with 8px cells and 2x2 blocks",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 141.2054333341075,
+      "compare_ms": 0.048133333621080965,
+      "feature_kb": 30.625,
+      "peak_memory_mb": 219.25
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.17248996943235395,
+        0.1970244586467743
+      ],
+      "impostor_range": [
+        0.14209254160523416,
+        0.2165461376309395
+      ],
+      "ranges_overlap": true,
+      "auc": 0.375,
+      "eer": 0.5,
+      "eer_threshold": 0.17248996943235395,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "combined",
+      "description": "Inner crop + multi-scale LBP + region weights + finer HOG",
+      "photos": 6,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [
+        {
+          "photo": "2.jpg",
+          "reason": "Could not find both eyes. Look straight at the camera and remove any sunglasses."
+        },
+        {
+          "photo": "3.jpg",
+          "reason": "No face detected by Haar cascade. Please face the camera directly."
+        }
+      ],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 143.94623333161385,
+      "compare_ms": 0.07353333300367619,
+      "feature_kb": 35.625,
+      "peak_memory_mb": 218.765625
+    }
+  ],
+  "same_photos": [
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.1092,
+        0.1393
+      ],
+      "impostor_range": [
+        0.0834,
+        0.1398
+      ],
+      "ranges_overlap": true,
+      "auc": 0.375,
+      "eer": 0.5,
+      "eer_threshold": 0.1092,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.5,
+        "correctly_accepted": 0.25,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.5
+      },
+      "name": "before_change",
+      "description": "Old pipeline, for comparison: Haar box crop and whole-image blur check",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 177.957449999667,
+      "compare_ms": 0.0238833332938763,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 231.3984375
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0875,
+        0.1191
+      ],
+      "impostor_range": [
+        0.0721,
+        0.1166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.0859,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "eye_align_only",
+      "description": "New eye alignment without the photo quality checks",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 166.33187500701752,
+      "compare_ms": 0.022016666965403903,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.0546875
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0875,
+        0.1191
+      ],
+      "impostor_range": [
+        0.0721,
+        0.1166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.0859,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "app_cutoff": {
+        "cutoff": 0.22,
+        "far": 1.0,
+        "frr": 0.0,
+        "identification": {
+          "known_probes": 4,
+          "closest_correct": 0.0,
+          "correctly_accepted": 0.0,
+          "unknown_probes": 4,
+          "unknown_accepted": 1.0
+        }
+      },
+      "name": "current_app",
+      "description": "The code the app runs today: photo checks, eye alignment, 0.6 LBP + 0.4 HOG",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 1,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 157.1271249995334,
+      "compare_ms": 0.02321666640151913,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.31640625
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.08950741589069366,
+        0.12589214742183685
+      ],
+      "impostor_range": [
+        0.07334430515766144,
+        0.12228874117136002
+      ],
+      "ranges_overlap": true,
+      "auc": 0.125,
+      "eer": 0.875,
+      "eer_threshold": 0.08734752982854843,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "lbp_only",
+      "description": "LBP texture alone",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 148.80702499795007,
+      "compare_ms": 0.029316666768863797,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.66015625
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.08449840545654297,
+        0.10883128643035889
+      ],
+      "impostor_range": [
+        0.07020312547683716,
+        0.10794240236282349
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.5,
+      "eer_threshold": 0.08449840545654297,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.0,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "hog_only",
+      "description": "HOG shape alone",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 163.14295000120183,
+      "compare_ms": 0.030449999030679464,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.91796875
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.09391441196203232,
+        0.11318766474723815
+      ],
+      "impostor_range": [
+        0.06017294526100159,
+        0.12590453773736954
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.875,
+      "eer_threshold": 0.08126179352402688,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "inner_crop_80",
+      "description": "Central 80% of the face, less hair and background",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 167.71492499901797,
+      "compare_ms": 0.03053333299855391,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 217.9375
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.09084546715021133,
+        0.11631974577903748
+      ],
+      "impostor_range": [
+        0.07826895713806152,
+        0.11575864702463151
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.5,
+      "eer_threshold": 0.09084546715021133,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.25,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.5
+      },
+      "name": "multiscale_lbp",
+      "description": "LBP at radius 1, 2, and 3",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 173.61517500103218,
+      "compare_ms": 0.0553666662502413,
+      "feature_kb": 9.5,
+      "peak_memory_mb": 218.296875
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.0722217470407486,
+        0.09565854221582412
+      ],
+      "impostor_range": [
+        0.05953678265213966,
+        0.09586984217166901
+      ],
+      "ranges_overlap": true,
+      "auc": 0.375,
+      "eer": 0.5,
+      "eer_threshold": 0.0722217470407486,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "region_weighted",
+      "description": "More LBP weight on eyes, nose, and mouth",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 158.42479999992065,
+      "compare_ms": 0.03098333157443752,
+      "feature_kb": 4.5,
+      "peak_memory_mb": 218.30078125
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.17812256515026093,
+        0.20496157705783846
+      ],
+      "impostor_range": [
+        0.15003323256969453,
+        0.21424300521612166
+      ],
+      "ranges_overlap": true,
+      "auc": 0.25,
+      "eer": 0.875,
+      "eer_threshold": 0.1673166409134865,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "finer_hog",
+      "description": "HOG with 8px cells and 2x2 blocks",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 151.68534999975236,
+      "compare_ms": 0.03176666844713812,
+      "feature_kb": 30.625,
+      "peak_memory_mb": 218.25390625
+    },
+    {
+      "genuine_pairs": 2,
+      "impostor_pairs": 4,
+      "genuine_range": [
+        0.17248996943235395,
+        0.1970244586467743
+      ],
+      "impostor_range": [
+        0.14209254160523416,
+        0.2165461376309395
+      ],
+      "ranges_overlap": true,
+      "auc": 0.375,
+      "eer": 0.5,
+      "eer_threshold": 0.17248996943235395,
+      "frr_at_far_1pct": 1.0,
+      "strict_threshold": -Infinity,
+      "held_out": null,
+      "identification": {
+        "known_probes": 4,
+        "closest_correct": 0.25,
+        "correctly_accepted": 0.0,
+        "unknown_probes": 4,
+        "unknown_accepted": 0.75
+      },
+      "name": "combined",
+      "description": "Inner crop + multi-scale LBP + region weights + finer HOG",
+      "photos": 4,
+      "people": 2,
+      "accepted": [
+        "D:\\face_test\\arpit\\1.jpg",
+        "D:\\face_test\\arpit\\3.jpg",
+        "D:\\face_test\\mit\\1.jpg",
+        "D:\\face_test\\mit\\2.jpg"
+      ],
+      "rejected": [],
+      "registration_rejected": 0,
+      "eyes_found_rate": 1.0,
+      "describe_ms": 165.39659999398282,
+      "compare_ms": 0.0553666662502413,
+      "feature_kb": 35.625,
+      "peak_memory_mb": 218.25
+    }
+  ]
+}

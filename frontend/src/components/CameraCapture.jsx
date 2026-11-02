@@ -106,9 +106,12 @@ export default function CameraCapture({ captured, onCapture, overlay }) {
         <div className="camera-live">
           <div className="camera-frame">
             <video ref={videoRef} autoPlay playsInline muted />
-            <div className="camera-guide" />
+            <div className="camera-guide">
+              <span className="camera-guide-eye left" />
+              <span className="camera-guide-eye right" />
+            </div>
           </div>
-          <p className="camera-hint">Center your face in the outline, then capture</p>
+          <p className="camera-hint">Fit your face in the outline with your eyes on the two marks, then capture</p>
           <button type="button" className="camera-btn" onClick={capture}>
             Capture Photo
           </button>

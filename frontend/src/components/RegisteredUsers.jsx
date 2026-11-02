@@ -62,7 +62,7 @@ export default function RegisteredUsers({ onNavigateRegister }) {
         <div>
           <h2>Registered Users Database</h2>
           <p className="subtitle">
-            All enrolled identities stored in <code>registered_users.json</code> and Pinecone.
+            All enrolled identities stored in <code>registered_users.json</code>.
           </p>
         </div>
         <div className="users-header-actions">
