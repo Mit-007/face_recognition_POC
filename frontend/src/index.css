@@ -1,9 +1,9 @@
 :root {
-  --text: #4b5563;
-  --text-h: #111827;
-  --bg: #f8f9fb;
+  --text: #526075;
+  --text-h: #172033;
+  --bg: #f6f8fc;
   --card-bg: #ffffff;
-  --border: #e3e6ea;
+  --border: #e4e9f1;
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-bg: rgba(79, 70, 229, 0.08);
@@ -11,7 +11,7 @@
   --success-bg: #ecfdf3;
   --error: #dc2626;
   --error-bg: #fef2f2;
-  --shadow: rgba(16, 24, 40, 0.06) 0 1px 2px, rgba(16, 24, 40, 0.04) 0 4px 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.06);
 
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
 
@@ -27,6 +27,17 @@
 
 * {
   box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.22);
+  outline-offset: 2px;
 }
 
 body {

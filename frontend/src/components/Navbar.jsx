@@ -19,16 +19,36 @@ export default function Navbar({ tab, setTab }) {
 
       <nav className="navbar-tabs">
         <button
+          type="button"
           className={tab === "register" ? "active" : ""}
+          aria-current={tab === "register" ? "page" : undefined}
           onClick={() => setTab("register")}
         >
           Register Person
         </button>
         <button
+          type="button"
           className={tab === "detect" ? "active" : ""}
+          aria-current={tab === "detect" ? "page" : undefined}
           onClick={() => setTab("detect")}
         >
           Detect Person
+        </button>
+        <button
+          type="button"
+          className={tab === "users" ? "active" : ""}
+          aria-current={tab === "users" ? "page" : undefined}
+          onClick={() => setTab("users")}
+        >
+          Registered Users
+        </button>
+        <button
+          type="button"
+          className={tab === "history" ? "active" : ""}
+          aria-current={tab === "history" ? "page" : undefined}
+          onClick={() => setTab("history")}
+        >
+          Detection History
         </button>
       </nav>
     </header>

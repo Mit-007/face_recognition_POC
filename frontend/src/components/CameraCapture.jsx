@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function CameraCapture({ captured, onCapture }) {
+export default function CameraCapture({ captured, onCapture, overlay }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -32,11 +32,15 @@ export default function CameraCapture({ captured, onCapture }) {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: {
+          facingMode: "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
       });
       streamRef.current = stream;
       setActive(true);
-    } catch (err) {
+    } catch {
       setError("Could not access camera. Please allow camera permission and try again.");
     }
   };
@@ -51,8 +55,22 @@ export default function CameraCapture({ captured, onCapture }) {
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Cap resolution to ideal biometric processing size (max 640px)
+    const MAX_DIM = 640;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > MAX_DIM || h > MAX_DIM) {
+      if (w > h) {
+        h = Math.round((h * MAX_DIM) / w);
+        w = MAX_DIM;
+      } else {
+        w = Math.round((w * MAX_DIM) / h);
+        h = MAX_DIM;
+      }
+    }
+
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d");
     // Mirror the capture to match the mirrored live preview the user saw.
     ctx.translate(canvas.width, 0);
@@ -63,11 +81,11 @@ export default function CameraCapture({ captured, onCapture }) {
       (blob) => {
         if (!blob) return;
         const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
-        onCapture(file, canvas.toDataURL("image/jpeg"));
+        onCapture(file, canvas.toDataURL("image/jpeg", 0.88));
         stopCamera();
       },
       "image/jpeg",
-      0.92
+      0.88
     );
   };
 
@@ -99,7 +117,10 @@ export default function CameraCapture({ captured, onCapture }) {
 
       {captured && (
         <div className="camera-preview">
-          <img src={captured} alt="captured" />
+          <div className="preview-frame" style={{ position: "relative", width: "100%" }}>
+            <img src={captured} alt="captured" />
+            {overlay}
+          </div>
           <button type="button" className="camera-btn secondary" onClick={retake}>
             Retake
           </button>

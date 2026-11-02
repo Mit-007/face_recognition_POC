@@ -56,5 +56,14 @@ def search_face(embedding, top_k: int = 1):
         vector=embedding.tolist(),
         top_k=top_k,
         include_metadata=True,
+        include_values=False,
     )
     return result.get("matches", [])
+
+
+def delete_face(vector_id: str):
+    try:
+        index = get_index()
+        index.delete(ids=[vector_id])
+    except Exception:
+        pass

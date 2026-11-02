@@ -1,0 +1,98 @@
+[
+  {
+    "id": "b5195905",
+    "timestamp": "2026-11-02 10:58:16",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.7914,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 3155.7,
+    "message": "Match verified: Mit"
+  },
+  {
+    "id": "6baee387",
+    "timestamp": "2026-11-02 10:58:01",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.5468,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 4907.4,
+    "message": "Match verified: Mit"
+  },
+  {
+    "id": "08fa131b",
+    "timestamp": "2026-11-02 10:57:39",
+    "matched": 0,
+    "status": "REJECTED",
+    "name": null,
+    "score": 0.0,
+    "threshold": 0.5,
+    "image_name": null,
+    "latency_ms": 962.6,
+    "message": "No face detected in the uploaded image."
+  },
+  {
+    "id": "2bc14052",
+    "timestamp": "2026-11-02 10:20:34",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.8529,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 5119.0,
+    "message": "Match verified: Mit"
+  },
+  {
+    "id": "fc68aa33",
+    "timestamp": "2026-11-02 10:16:24",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "arpit bala",
+    "score": 0.9076,
+    "threshold": 0.5,
+    "image_name": "5daf2cc8-c790-48dd-b89e-6b393390b4c9.jpg",
+    "latency_ms": 2993.4,
+    "message": "Match verified: arpit bala"
+  },
+  {
+    "id": "4d2b07ef",
+    "timestamp": "2026-11-02 10:15:20",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.8623,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 5128.4,
+    "message": "Match verified: Mit"
+  },
+  {
+    "id": "5f96dceb",
+    "timestamp": "2026-11-02 10:14:17",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.8297,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 34050.5,
+    "message": "Match verified: Mit"
+  },
+  {
+    "id": "ed5c2207",
+    "timestamp": "2026-11-02 10:04:05",
+    "matched": 1,
+    "status": "MATCHED",
+    "name": "Mit",
+    "score": 0.861,
+    "threshold": 0.5,
+    "image_name": "617a4aa1-94ce-498f-9917-e6ebc6afa206.jpg",
+    "latency_ms": 26758.0,
+    "message": "Match verified: Mit"
+  }
+]

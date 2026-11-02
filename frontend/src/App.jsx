@@ -2,6 +2,8 @@ import { useState } from "react";
 import Navbar from "./components/Navbar";
 import RegisterPerson from "./components/RegisterPerson";
 import DetectPerson from "./components/DetectPerson";
+import RegisteredUsers from "./components/RegisteredUsers";
+import DetectionHistory from "./components/DetectionHistory";
 import "./App.css";
 
 function App() {
@@ -11,12 +13,15 @@ function App() {
     <div className="page">
       <Navbar tab={tab} setTab={setTab} />
 
-      <main className="app">
-        {tab === "register" ? <RegisterPerson /> : <DetectPerson />}
+      <main className={`app ${tab !== "detect" ? "app-wide" : ""}`}>
+        {tab === "register" && <RegisterPerson onNavigateUsers={() => setTab("users")} />}
+        {tab === "detect" && <DetectPerson onNavigateHistory={() => setTab("history")} />}
+        {tab === "users" && <RegisteredUsers onNavigateRegister={() => setTab("register")} />}
+        {tab === "history" && <DetectionHistory />}
       </main>
 
       <footer className="app-footer">
-        <p>FaceID Recognition System &middot; Internal POC</p>
+        <p>FaceID Biometric System &middot; Enterprise Identity Platform</p>
       </footer>
     </div>
   );
