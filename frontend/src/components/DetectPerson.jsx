@@ -4,6 +4,12 @@ import CameraCapture from "./CameraCapture";
 import FaceOverlay from "./FaceOverlay";
 import StatusBanner from "./StatusBanner";
 
+const DECISIONS = {
+  verified: { badge: "✓ VERIFIED", title: null },
+  retake: { badge: "PLEASE RETAKE", title: "Not Sure Who This Is" },
+  unknown: { badge: "NOT VERIFIED", title: "Unknown Person" },
+};
+
 export default function DetectPerson({ onNavigateHistory }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -45,20 +51,19 @@ export default function DetectPerson({ onNavigateHistory }) {
         kps={result.kps}
         imageDimensions={result.image_dimensions}
         name={result.name}
-        score={result.score}
+        decision={result.decision}
         matched={result.matched}
         latencyMs={result.latency_ms}
       />
     ) : null;
 
-  const thresholdPct = result ? (result.threshold * 100).toFixed(0) : null;
-  const barStatus = result?.matched ? "success" : "denied";
+  const decision = result ? DECISIONS[result.decision] : null;
 
   return (
     <form className="card" onSubmit={onSubmit}>
       <h2>Detect Person</h2>
       <p className="subtitle">
-        Capture a live photo to verify identity and find the most similar registered person via Classical Face Similarity (LBP + HOG).
+        Capture a live photo to verify identity using Classical Face Similarity (LBP + HOG).
       </p>
 
       <div className="field">
@@ -68,71 +73,46 @@ export default function DetectPerson({ onNavigateHistory }) {
 
       <button type="submit" disabled={loading}>
         {loading && <span className="spinner" />}
-        {loading ? "Comparing Face Descriptors..." : "Detect & Find Most Similar"}
+        {loading ? "Comparing Face Descriptors..." : "Detect Person"}
       </button>
 
       {error && <StatusBanner type="error">{error}</StatusBanner>}
 
-      {/* Verification Card (matched or unrecognized face) */}
+      {/* Verification Card */}
       {result && result.face_detected && (
         <div className={`verification-card ${result.matched ? "match-success" : "match-denied"}`}>
           <div className="verification-header">
-            <span className={`badge-pill ${barStatus}`}>
-              {result.matched ? "✓ MATCH VERIFIED" : "NO MATCH VERIFIED"}
+            <span className={`badge-pill ${result.matched ? "success" : "denied"}`}>
+              {decision.badge}
             </span>
             {result.latency_ms && <span className="latency-tag">⚡ {result.latency_ms} ms</span>}
           </div>
 
           <div className="verification-body">
             <div className="verification-title">
-              <h3>{result.matched ? result.name : "Unrecognized Person"}</h3>
-              <p>
-                {result.matched
-                  ? `Top candidate matched with distance below cutoff (${result.final_distance?.toFixed(3)} ≤ ${(1 - result.threshold).toFixed(3)})`
-                  : result.message}
-              </p>
+              <h3>{result.matched ? result.name : decision.title}</h3>
+              <p>{result.message}</p>
             </div>
 
-            {/* Feature Distance Chips */}
+            {/* Feature Distance Chips: lower is closer, and these are not percentages */}
             {result.final_distance !== undefined && (
               <div className="classical-chips">
                 <span className="classical-chip">
-                  {result.matched ? "Weighted Distance" : "Closest Distance"}: <strong>{result.final_distance?.toFixed(4)}</strong>
+                  Closest Distance: <strong>{result.final_distance.toFixed(3)}</strong> (limit {result.cutoff.toFixed(3)})
+                </span>
+                {result.second_distance !== null && (
+                  <span className="classical-chip">
+                    Second Closest: <strong>{result.second_distance.toFixed(3)}</strong> (needs a gap of {result.margin.toFixed(3)})
+                  </span>
+                )}
+                <span className="classical-chip">
+                  LBP Texture (Chi²): <strong>{result.lbp_distance.toFixed(3)}</strong>
                 </span>
                 <span className="classical-chip">
-                  LBP Texture (Chi²): <strong>{result.lbp_distance?.toFixed(4)}</strong>
-                </span>
-                <span className="classical-chip">
-                  HOG Shape (Cosine): <strong>{result.hog_distance?.toFixed(4)}</strong>
+                  HOG Shape (Cosine): <strong>{result.hog_distance.toFixed(3)}</strong>
                 </span>
               </div>
             )}
-
-            {/* Similarity Meter */}
-            <div className="confidence-meter">
-              <div className="meter-label">
-                <span>{result.matched ? "Resemblance Score (1 - Distance)" : "Closest Candidate Resemblance"}</span>
-                <strong>
-                  {(result.score * 100).toFixed(1)}% ({result.score.toFixed(3)})
-                </strong>
-              </div>
-              <div className="meter-track">
-                <div
-                  className={`meter-bar ${barStatus}`}
-                  style={{ width: `${Math.min(100, Math.max(0, result.score * 100))}%` }}
-                />
-                <div
-                  className="meter-threshold-line"
-                  style={{ left: `${thresholdPct}%` }}
-                  title={`Match Cutoff: ${thresholdPct}%`}
-                />
-              </div>
-              <div className="meter-footer">
-                <span>0%</span>
-                <span className="cutoff-tag">Match Cutoff: {thresholdPct}%</span>
-                <span>100%</span>
-              </div>
-            </div>
 
             {/* Side-by-Side Reference */}
             {result.image_name && (
@@ -146,34 +126,43 @@ export default function DetectPerson({ onNavigateHistory }) {
               </div>
             )}
 
-            {/* Ranked Candidates, also shown on denial to reveal the closest matches */}
-            {result.ranked_candidates && result.ranked_candidates.length > 0 && (
-              <div className="ranking-section">
-                <h4 className="ranking-title">
-                  Database Distance Ranking ({result.matched ? "Most Similar First" : "Closest Resemblances"})
+            {/* Score Analysis: every registered person, closest first */}
+            {result.ranked_candidates.length > 0 && (
+              <div className="comparison-section">
+                <h4 className="comparison-title">
+                  All Registered People ({result.ranked_candidates.length}), Closest First
                 </h4>
-                <div className="ranking-list">
-                  {result.ranked_candidates.map((cand, idx) => (
-                    <div key={cand.person_id || idx} className="ranking-item">
-                      <span className="ranking-rank">#{idx + 1}</span>
-                      <div className="ranking-person">
-                        {cand.image_name && (
-                          <img
-                            src={imageUrl(cand.image_name)}
-                            alt={cand.name}
-                            className="ranking-thumb"
-                          />
-                        )}
-                        <span className="ranking-name">{cand.name}</span>
-                      </div>
-                      <div className="ranking-metrics">
-                        <span className="ranking-dist">dist: {cand.final_distance?.toFixed(3)}</span>
-                        <span className="ranking-score">
-                          {(cand.similarity_score * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <p className="comparison-hint">Lower distance means more alike. These are not percentages.</p>
+                <div className="comparison-table-wrap">
+                  <table className="comparison-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Person</th>
+                        <th>Distance</th>
+                        <th>LBP</th>
+                        <th>HOG</th>
+                        <th>Within Limit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.ranked_candidates.map((candidate, index) => (
+                        <tr key={candidate.person_id}>
+                          <td>{index + 1}</td>
+                          <td>
+                            <div className="comparison-person">
+                              <img src={imageUrl(candidate.image_name)} alt={candidate.name} />
+                              <span>{candidate.name}</span>
+                            </div>
+                          </td>
+                          <td><strong>{candidate.final_distance.toFixed(3)}</strong></td>
+                          <td>{candidate.lbp_distance.toFixed(3)}</td>
+                          <td>{candidate.hog_distance.toFixed(3)}</td>
+                          <td>{candidate.final_distance <= result.cutoff ? "Yes" : "No"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

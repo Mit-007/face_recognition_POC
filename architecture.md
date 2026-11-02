@@ -33,7 +33,7 @@ flowchart TD
             Normalize["3. Normalization\n128x128 Grayscale -> CLAHE"]
             FeatExtract["4. Hand-Crafted Feature Extraction\n- LBP (8x8 Grid -> 640-dim Texture Vector)\n- HOG (8 Bins, 16px Cell -> 512-dim Edge Vector)"]
             Distance["5. Dual Metric Distance Engine\n- LBP: Chi-Square Distance\n- HOG: Cosine Distance\n- Final Distance = 0.6*LBP + 0.4*HOG"]
-            Ranker["6. Database Distance Ranker\nCompare against all registered faces -> Return most similar"]
+            Ranker["6. Database Distance Ranker\nCompare against all registered faces -> Apply cutoff and clear-winner rule"]
         end
         
         DiskStore[("Local Disk Store\nbackend/database_images/")]
@@ -52,7 +52,7 @@ flowchart TD
     
     FeatExtract --> Distance --> Ranker
     Ranker -->|Read Reference Features| MemCache
-    Ranker -->|Return Best Match + Rankings| API
+    Ranker -->|Return Decision + Distances| API
 ```
 
 ---
@@ -80,7 +80,7 @@ D:\face_recognition_POC\
 │   ├── src\
 │   │   ├── components\
 │   │   │   ├── CameraCapture.jsx      # Webcam stream, canvas grabber, resolution cap
-│   │   │   ├── DetectPerson.jsx       # Detection view, distance chips, and ranking
+│   │   │   ├── DetectPerson.jsx       # Detection view, decision, distance chips, and score table
 │   │   │   ├── DetectionHistory.jsx   # Searchable detection audit log table
 │   │   │   ├── FaceOverlay.jsx        # SVG visual bounding box & eyes overlay
 │   │   │   ├── Navbar.jsx             # Tab navigation (Register, Detect, Users, History)
@@ -120,9 +120,12 @@ When an identity verification scan is performed:
    - Computes Chi-Square distance on LBP: $\text{dist}_{\text{LBP}}$
    - Computes Cosine distance on HOG: $\text{dist}_{\text{HOG}}$
    - Calculates weighted distance: $\mathbf{\text{Distance} = 0.6 \times \text{LBP} + 0.4 \times \text{HOG}}$
-   - Resemblance score: $\max(0.0, 1.0 - \text{Distance})$
-4. Ranks all candidates ascending by distance (closest resemblance first).
-5. If the closest candidate's distance $\le 0.22$ (resemblance $\ge 78\%$), returns **MATCH VERIFIED** with candidate details, side-by-side reference portrait, and database ranking list.
+4. Ranks all candidates ascending by distance (closest first).
+5. Makes a decision. Both limits are set in `backend/.env`:
+   - **Verified**: the closest distance is within `MATCH_DISTANCE_CUTOFF` and at least `MATCH_CLEAR_WINNER_MARGIN` below the second-closest. The clear-winner rule is skipped when only one person is registered.
+   - **Please retake**: within the cutoff, but the two closest people are too similar.
+   - **Unknown person**: above the cutoff.
+   Every scan also returns all registered people's names, portraits, and distances, closest first, for score analysis.
 6. Records the audit event in `detection_history.json`.
 
 ---
@@ -130,6 +133,6 @@ When an identity verification scan is performed:
 ## 4. Key Strengths of This Approach
 
 1. **No Embeddings or Large Models**: The only model is a YuNet face detector of about 232 KB, run by OpenCV on the CPU. It locates faces but doesn't identify anyone.
-2. **Deterministic & Fully Explainable**: Face resemblance is computed directly from raw skin texture variations (LBP) and gradient edge contours (HOG).
+2. **Deterministic & Fully Explainable**: Face distance is computed directly from raw skin texture variations (LBP) and gradient edge contours (HOG).
 3. **No External Cloud Vector Dependencies**: Runs 100% locally on CPU without Pinecone or third-party cloud database calls.
 4. **Measured Memory Use**: About **100 MB of RAM** on Windows with one registered person and photos up to 640 px, with OpenCL off and one server process. Much larger photos sent straight to the API can use far more.

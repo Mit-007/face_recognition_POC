@@ -76,7 +76,7 @@ export default function DetectionHistory() {
         <div>
           <h2>Detection History Log</h2>
           <p className="subtitle">
-            Audit log of all facial recognition scans, confidence scores, and timestamps.
+            Audit log of all facial recognition scans, distances, and timestamps.
           </p>
         </div>
         <div className="history-top-actions">
@@ -181,14 +181,15 @@ export default function DetectionHistory() {
                 <th>Timestamp</th>
                 <th>Status</th>
                 <th>Identified Person</th>
-                <th>Confidence Score</th>
+                <th>Closest Distance</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((item) => {
                 const isMatch = item.matched === 1;
-                const scorePct = (item.score * 100).toFixed(1);
-                const thresholdPct = (item.threshold * 100).toFixed(0);
+                // A score of 0 means no comparison happened, such as a rejected photo
+                const distance = item.score > 0 ? (1 - item.score).toFixed(3) : "—";
+                const cutoff = (1 - item.threshold).toFixed(3);
 
                 return (
                   <tr key={item.id} className={isMatch ? "row-matched" : "row-rejected"}>
@@ -226,16 +227,9 @@ export default function DetectionHistory() {
                     <td className="col-score">
                       <div className="score-cell">
                         <div className="score-text">
-                          <strong>{scorePct}%</strong>
-                          <span className="score-raw">({item.score.toFixed(3)})</span>
+                          <strong>{distance}</strong>
                         </div>
-                        <div className="table-meter-track">
-                          <div
-                            className={`table-meter-bar ${isMatch ? "success" : "rejected"}`}
-                            style={{ width: `${Math.min(100, Math.max(0, item.score * 100))}%` }}
-                          />
-                        </div>
-                        <span className="score-cutoff-hint">Cutoff: {thresholdPct}%</span>
+                        <span className="score-cutoff-hint">Limit: {cutoff}</span>
                       </div>
                     </td>
                   </tr>

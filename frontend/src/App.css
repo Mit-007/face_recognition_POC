@@ -534,76 +534,6 @@ button[type="submit"]:disabled {
   color: var(--text);
 }
 
-/* ---------- Confidence Meter & Bar ---------- */
-
-.confidence-meter {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  background: rgba(255, 255, 255, 0.8);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-}
-
-.meter-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.meter-label strong {
-  color: var(--text-h);
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.meter-track {
-  position: relative;
-  width: 100%;
-  height: 10px;
-  background: #e2e8f0;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.meter-bar {
-  height: 100%;
-  border-radius: 6px;
-  transition: width 0.35s ease;
-}
-
-.meter-bar.success {
-  background: linear-gradient(90deg, #34d399, #10b981);
-}
-
-.meter-bar.denied {
-  background: linear-gradient(90deg, #f87171, #ef4444);
-}
-
-.meter-threshold-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #0f172a;
-  z-index: 2;
-}
-
-.meter-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: #94a3b8;
-}
-
-.cutoff-tag {
-  color: var(--accent);
-  font-weight: 600;
-}
-
 /* ---------- Reference Gallery ---------- */
 
 .reference-gallery {
@@ -1038,33 +968,6 @@ button[type="submit"]:disabled {
   color: var(--text-h);
 }
 
-.score-raw {
-  font-size: 10.5px;
-  color: #64748b;
-  font-family: monospace;
-}
-
-.table-meter-track {
-  width: 100%;
-  height: 6px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.table-meter-bar {
-  height: 100%;
-  border-radius: 4px;
-}
-
-.table-meter-bar.success {
-  background: #10b981;
-}
-
-.table-meter-bar.rejected {
-  background: #ef4444;
-}
-
 .score-cutoff-hint {
   font-size: 10px;
   color: #94a3b8;
@@ -1242,6 +1145,69 @@ button[type="submit"]:disabled {
   max-width: 280px;
 }
 
+/* ---------- Score Analysis Table ---------- */
+
+.comparison-section {
+  margin-top: 16px;
+}
+
+.comparison-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.comparison-hint {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.comparison-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.comparison-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.comparison-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comparison-person img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 /* ---------- Classical Distance Chips ---------- */
 
 .classical-chips {
@@ -1268,78 +1234,4 @@ button[type="submit"]:disabled {
   color: #0f172a;
 }
 
-/* Ranked Candidates List */
-.ranking-section {
-  margin-top: 16px;
-  border-top: 1px dashed var(--border);
-  padding-top: 14px;
-}
-
-.ranking-title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted, #64748b);
-  margin-bottom: 8px;
-}
-
-.ranking-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ranking-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 12px;
-}
-
-.ranking-rank {
-  font-weight: 700;
-  color: var(--accent);
-  width: 20px;
-}
-
-.ranking-person {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-
-.ranking-thumb {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  object-fit: cover;
-}
-
-.ranking-name {
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.ranking-metrics {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: monospace;
-  font-size: 11.5px;
-}
-
-.ranking-dist {
-  color: #64748b;
-}
-
-.ranking-score {
-  font-weight: 700;
-  color: #10b981;
-}
 

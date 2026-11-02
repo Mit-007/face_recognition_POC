@@ -1,21 +1,5 @@
 [
   {
-    "person_id": "68e68be7-c121-4e58-99ab-d86b2abdcd2d",
-    "first_name": "Tom",
-    "last_name": "Holland",
-    "name": "Tom Holland",
-    "image_name": "68e68be7-c121-4e58-99ab-d86b2abdcd2d.jpg",
-    "registered_at": "2026-11-02 17:40:59"
-  },
-  {
-    "person_id": "8eea87f7-5957-47c7-94f9-b164d3df59ae",
-    "first_name": "arpit",
-    "last_name": "patel",
-    "name": "arpit patel",
-    "image_name": "8eea87f7-5957-47c7-94f9-b164d3df59ae.jpg",
-    "registered_at": "2026-11-02 17:37:58"
-  },
-  {
     "person_id": "0d6a97f2-805c-4ae9-97d7-743edd2e4e8f",
     "first_name": "Mit",
     "last_name": "PAtel",

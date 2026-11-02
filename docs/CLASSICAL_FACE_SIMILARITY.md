@@ -74,14 +74,16 @@ Given query descriptors $(P_{\text{LBP}}, \mathbf{u}_{\text{HOG}})$ and referenc
    $$\text{Final Distance} = 0.6 \times \text{dist}_{\text{LBP}} + 0.4 \times \text{dist}_{\text{HOG}}$$
    $$\text{Similarity Score} = \max(0.0, 1.0 - \text{Final Distance})$$
 
-### Stage 6: Database Ranking
-- Compares query against all registered identities in `database_images/`.
-- Sorts results ascending by `final_distance` (smaller distance = closest resemblance).
-- Verified threshold: $\text{distance} \le 0.22$ (similarity $\ge 0.78$).
+### Stage 6: Ranking and Decision
+- Compares query against all registered identities, and sorts results ascending by `final_distance` (smaller distance = more alike).
+- **Verified**: the closest distance is within `MATCH_DISTANCE_CUTOFF` (default 0.07) and at least `MATCH_CLEAR_WINNER_MARGIN` (default 0.004) below the second-closest. The margin rule is skipped when only one person is registered.
+- **Please retake**: within the cutoff, but the two closest people are too similar.
+- **Unknown person**: above the cutoff.
+- Every scan returns all registered people's distances, closest first, for score analysis. The similarity score isn't a probability, so the interface shows distances instead.
 
 ---
 
 ## 3. API Endpoints
 
 - `POST /register_new_person`: Validates a portrait, stores it locally, and caches its LBP + HOG descriptors.
-- `POST /detect_person`: Runs the classical LBP + HOG pipeline and returns match status, distance breakdown, and top-5 ranked candidates.
+- `POST /detect_person`: Runs the classical LBP + HOG pipeline and returns the decision, distance breakdown, and every registered person's distances.

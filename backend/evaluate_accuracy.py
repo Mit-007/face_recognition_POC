@@ -48,7 +48,8 @@ from classical_face_service import (
 load_dotenv()
 
 DEFAULT_DATASET = Path(__file__).resolve().parent.parent / "data_images"
-DEFAULT_CUTOFF = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.22"))
+DEFAULT_CUTOFF = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.07"))
+DEFAULT_MARGIN = float(os.getenv("MATCH_CLEAR_WINNER_MARGIN", "0.004"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 RAM_LIMIT_MB = 100.0
 TARGET_FAR = 0.01
@@ -342,19 +343,23 @@ def _closest_person(
     photos_by_person: Dict[str, List[int]],
     excluded: set,
     enroll: int,
-) -> Optional[Tuple[str, float]]:
-    """Finds the closest person the way the app does, using up to `enroll` photos per person."""
-    best: Optional[Tuple[str, float]] = None
+) -> Optional[Tuple[str, float, float]]:
+    """
+    Finds the closest person the way the app does, using up to `enroll` photos per person.
+    Returns (person, distance, gap to the second-closest person).
+    """
+    scores: List[Tuple[float, str]] = []
     for person, photos in photos_by_person.items():
         if person in excluded:
             continue
         enrolled = [i for i in photos if i != probe][:enroll]
-        if not enrolled:
-            continue
-        score = float(np.min(matrix[probe, enrolled]))
-        if best is None or score < best[1]:
-            best = (person, score)
-    return best
+        if enrolled:
+            scores.append((float(np.min(matrix[probe, enrolled])), person))
+    if not scores:
+        return None
+    scores.sort()
+    gap = scores[1][0] - scores[0][0] if len(scores) > 1 else float("inf")
+    return scores[0][1], scores[0][0], gap
 
 
 def _identification(
@@ -363,6 +368,7 @@ def _identification(
     unsure: Dict[str, set],
     enroll: int,
     threshold: float,
+    margin: float = 0.0,
 ) -> Dict[str, Any]:
     photos_by_person: Dict[str, List[int]] = {}
     for i, person in enumerate(labels):
@@ -379,13 +385,13 @@ def _identification(
             if found:
                 known_probes += 1
                 closest_correct += found[0] == person
-                accepted_correct += found[0] == person and found[1] <= threshold
+                accepted_correct += found[0] == person and found[1] <= threshold and found[2] >= margin
 
         # This person is not enrolled, so any acceptance is an error
         found = _closest_person(matrix, probe, photos_by_person, partners | {person}, enroll)
         if found:
             unknown_probes += 1
-            unknown_accepted += found[1] <= threshold
+            unknown_accepted += found[1] <= threshold and found[2] >= margin
 
     return {
         "known_probes": known_probes,
@@ -402,6 +408,7 @@ def compute_metrics(
     unsure_pairs: List[Tuple[str, str]],
     enroll: int,
     app_cutoff: Optional[float],
+    app_margin: float = 0.0,
 ) -> Dict[str, Any]:
     """Calculates all accuracy numbers from a symmetric photo-to-photo distance matrix."""
     label_array = np.array(labels)
@@ -443,9 +450,10 @@ def compute_metrics(
     if app_cutoff is not None:
         metrics["app_cutoff"] = {
             "cutoff": app_cutoff,
+            "margin": app_margin,
             "far": float(np.mean(impostor <= app_cutoff)),
             "frr": float(np.mean(genuine > app_cutoff)),
-            "identification": _identification(matrix, labels, unsure, enroll, app_cutoff),
+            "identification": _identification(matrix, labels, unsure, enroll, app_cutoff, app_margin),
         }
     return metrics
 
@@ -557,6 +565,7 @@ def run_approach(approach: Approach, args: argparse.Namespace) -> Dict[str, Any]
             [tuple(pair) for pair in args.unsure_pair],
             args.enroll,
             args.cutoff if approach.uses_app_cutoff else None,
+            args.margin,
         )
     except ValueError as e:
         summary["error"] = str(e)
@@ -646,9 +655,9 @@ def print_report(all_results: List[Dict[str, Any]], args: argparse.Namespace, ti
         if "app_cutoff" in r:
             app = r["app_cutoff"]
             ident = app["identification"]
-            print(f"\nAPP AS CONFIGURED TODAY ({r['name']}, cutoff {app['cutoff']:.2f})")
-            print(f"  Different-people pairs accepted: {_pct(app['far'])}")
-            print(f"  Same-person pairs rejected:      {_pct(app['frr'])}")
+            print(f"\nAPP AS CONFIGURED TODAY ({r['name']}, cutoff {app['cutoff']:.3f}, clear-winner margin {app['margin']:.3f})")
+            print(f"  Different-people pairs within cutoff: {_pct(app['far'])}")
+            print(f"  Same-person pairs outside cutoff:     {_pct(app['frr'])}")
             print(f"  Known person correctly verified: {_pct(ident['correctly_accepted'])}")
             print(f"  Unknown person accepted:         {_pct(ident['unknown_accepted'])}")
             print(f"  Accepted photos failing the stricter registration checks: {r['registration_rejected']}")
@@ -683,6 +692,7 @@ def _run_workers(names: List[str], args: argparse.Namespace, only_photos: Option
             "--dataset", args.dataset,
             "--enroll", str(args.enroll),
             "--cutoff", str(args.cutoff),
+            "--margin", str(args.margin),
         ]
         for a, b in args.unsure_pair:
             command += ["--unsure-pair", a, b]
@@ -700,6 +710,7 @@ def main() -> None:
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET), help="Folder of test photos")
     parser.add_argument("--enroll", type=int, default=1, help="Registered photos per person")
     parser.add_argument("--cutoff", type=float, default=DEFAULT_CUTOFF, help="Cutoff the app uses")
+    parser.add_argument("--margin", type=float, default=DEFAULT_MARGIN, help="Clear-winner margin the app uses")
     parser.add_argument("--approach", action="append", help="Run only this approach (repeatable)")
     parser.add_argument(
         "--unsure-pair",

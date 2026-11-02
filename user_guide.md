@@ -7,9 +7,9 @@ Welcome to the **Face Recognition System** (Proof of Concept). This application 
 ## 1. System Overview
 
 - **Register New Person**: Captures a live face photo, locates the face and its landmarks with YuNet, checks photo quality, normalizes lighting using CLAHE, and stores the portrait locally in `database_images/` with cached LBP and HOG descriptors.
-- **Detect & Rank Mode**: Captures a face from the camera, extracts texture (LBP) and edge (HOG) descriptors, compares them against all registered persons using a calibrated distance metric ($0.6 \times \text{LBP} + 0.4 \times \text{HOG}$), and returns the **most similar person** along with a full database distance ranking list.
+- **Detect Mode**: Captures a face from the camera, extracts texture (LBP) and edge (HOG) descriptors, compares them against all registered persons using a distance metric ($0.6 \times \text{LBP} + 0.4 \times \text{HOG}$), and returns **Verified**, **Please retake**, or **Unknown person**.
 - **Registered Users Catalog**: Dedicated tab displaying all enrolled identities with instant search and one-click removal.
-- **Detection History Log**: Real-time audit log tracking every recognition attempt, distance metrics, resemblance scores, and statuses.
+- **Detection History Log**: Real-time audit log tracking every recognition attempt, closest distances, and statuses.
 
 ```
 ┌─────────────────┐       ┌────────────────────────┐       ┌─────────────────┐
@@ -70,24 +70,20 @@ npm run dev
 
 ---
 
-### Path B: Detecting & Returning Most Similar Person
+### Path B: Detecting a Person
 1. Click the **"Detect"** tab in the top navigation bar.
 2. Click **"Open Camera"**, fit your face in the outline with your eyes on the two marks, and click **"Capture Photo"**. If the photo fails a check, retake it using the message shown.
-3. Click **"Detect & Find Most Similar"**.
+3. Click **"Detect Person"**.
 4. The system compares the captured photo against all enrolled portraits:
-   - **Match Verified (Green HUD + Card)**:
-     - Shows the top candidate's name and resemblance score.
-     - Displays the feature distance breakdown:
-       - **Weighted Distance**: $0.6 \times \text{LBP} + 0.4 \times \text{HOG}$
-       - **LBP Texture Distance (Chi²)**
-       - **HOG Shape Distance (Cosine)**
-     - Displays the reference portrait side-by-side with your scan.
-     - Displays the **Database Distance Ranking** list showing all enrolled candidates sorted from most similar to least similar.
-   - **No Match / Unknown (Red HUD + Card)**:
-     - If the closest candidate's distance exceeds the cutoff ($> 0.220$), reports "Unknown person" and still shows the closest candidate resemblances for full transparency.
+   - **Verified (Green Card)**: The closest person is within the distance limit and clearly ahead of the second-closest. Shows their name and reference portrait.
+   - **Please Retake (Red Card)**: The closest person is within the limit, but the second-closest is too near to be sure.
+   - **Unknown Person (Red Card)**: The closest person is above the distance limit.
+   - Every result shows the closest and second-closest distances, where lower means more alike. These are not percentages or probabilities.
+   - Every result also lists all registered people, closest first, with their distance, LBP, HOG, and whether they are within the limit. This is for score analysis, and it shows registered people's names and photos to whoever is scanning.
+5. To tune the result, change `MATCH_DISTANCE_CUTOFF` and `MATCH_CLEAR_WINNER_MARGIN` in `backend/.env` and restart the backend.
 
 ---
 
 ### Path C: Managing Registered Users & Audit Logs
 - **Registered Users Tab**: Search, browse enrolled portraits, or click **"✕ Remove"** to deregister any identity.
-- **Detection History Tab**: View a complete chronological log of all recognition scans with status badges, resemblance scores, and reference avatars.
+- **Detection History Tab**: View a complete chronological log of all recognition scans with status badges, closest distances, and reference avatars.

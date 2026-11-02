@@ -3,7 +3,7 @@ export default function FaceOverlay({
   kps = [],
   imageDimensions,
   name,
-  score,
+  decision,
   matched,
   latencyMs,
 }) {
@@ -21,13 +21,11 @@ export default function FaceOverlay({
   const textColor = "#ffffff";
 
   // Label text
-  let labelText = "Face Detected";
+  let labelText = "Unknown Person";
   if (matched && name) {
-    labelText = score !== undefined ? `${name} · ${(score * 100).toFixed(1)}%` : name;
-  } else if (!matched && score !== undefined && score > 0) {
-    labelText = `Unknown · ${(score * 100).toFixed(1)}%`;
-  } else if (!matched) {
-    labelText = "Unrecognized";
+    labelText = name;
+  } else if (decision === "retake") {
+    labelText = "Please Retake";
   }
 
   // Label badge placement
