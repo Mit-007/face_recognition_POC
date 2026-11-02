@@ -17,8 +17,7 @@ from classical_face_service import (
     rank_candidates,
     cache_user_features,
     invalidate_feature_cache,
-    get_face_cascade,
-    get_eye_cascade,
+    get_face_detector,
 )
 from history_service import add_detection_record, get_detection_history, clear_detection_history
 from user_service import add_registered_user, get_registered_users, delete_registered_user
@@ -34,16 +33,15 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-warm Haar Cascades on startup
+    # Pre-warm the YuNet face detector on startup
     try:
-        get_face_cascade()
-        get_eye_cascade()
+        get_face_detector()
     except Exception:
         pass
     yield
 
 
-app = FastAPI(title="Classical Face Recognition (Non-ML)", lifespan=lifespan)
+app = FastAPI(title="Face Recognition (YuNet + LBP + HOG)", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -93,7 +91,7 @@ async def register_new_person(
 ):
     """
     Registers a new person:
-    1. Applies the strict registration photo checks and aligns the face using both eyes.
+    1. Applies the strict registration photo checks and aligns the face using its landmarks.
     2. Saves reference portrait to database_images/.
     3. Persists user profile in registered_users.json.
     4. Caches LBP & HOG feature descriptors in memory for instant matching.
@@ -144,9 +142,9 @@ async def register_new_person(
 @app.post("/detect_person")
 async def detect_person(file: UploadFile = File(...)):
     """
-    Detects and identifies a person using the Classical Non-ML pipeline:
-    1. Detects face with Haar Cascade and applies the detection photo checks.
-    2. Aligns the face using both eyes and normalizes to 128x128 CLAHE grayscale.
+    Detects and identifies a person using hand-crafted face features:
+    1. Detects face and landmarks with YuNet and applies the detection photo checks.
+    2. Aligns the face using its landmarks and normalizes to 128x128 CLAHE grayscale.
     3. Extracts 8x8 grid LBP (texture, 640-d) and HOG (edges, 512-d).
     4. Compares against all registered faces using:
        Final Distance = 0.6 * ChiSquare(LBP) + 0.4 * Cosine(HOG).

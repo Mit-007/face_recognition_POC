@@ -1,4 +1,3 @@
-import itertools
 import math
 import os
 from dataclasses import dataclass
@@ -11,27 +10,33 @@ from skimage.feature import local_binary_pattern, hog
 cv2.ocl.setUseOpenCL(False)
 
 # Thresholds and configuration
-MIN_FACE_SIZE_PX = 30
 GRID_SIZE = 8
 CELL_SIZE = 16  # 128 / 8
 TARGET_SIZE = (128, 128)
 
-# Every face is warped so the eyes land on the same pixels of the output image
-ALIGN_WORK_SIZE = 256  # Warped at twice the final size, then shrunk, to avoid aliasing
-EYE_DISTANCE_RATIO = 0.40
-EYE_Y_RATIO = 0.36
+# YuNet face detector settings
+DETECTION_SCORE_THRESHOLD = 0.7
+DETECTION_NMS_THRESHOLD = 0.3
+DETECTION_TOP_K = 50
+MAX_DETECTION_SIDE = 640  # Larger photos are shrunk for detection, which is more reliable
 
-# Limits for accepting a pair of eye detections
-MIN_EYE_DISTANCE_RATIO = 0.25
-MAX_EYE_DISTANCE_RATIO = 0.65
-MAX_EYE_TILT_DEGREES = 25.0
-MAX_EYE_SIZE_RATIO = 1.6
-MAX_EYE_PAIR_OFFSET = 0.25
-MIN_EYE_SIZE_RATIO = 0.08
-SMALL_FACE_PX = 200  # Faces narrower than this also get an enlarged eye search
+# Every face is warped so these landmarks land as close as possible to the same
+# spots in the output image: eyes, nose tip, then mouth corners (as fractions of its size)
+ALIGN_WORK_SIZE = 256  # Warped at twice the final size, then shrunk, to avoid aliasing
+LANDMARK_TEMPLATE = np.array(
+    [
+        [0.300, 0.360],
+        [0.700, 0.360],
+        [0.500, 0.587],
+        [0.334, 0.821],
+        [0.666, 0.821],
+    ],
+    dtype=np.float64,
+)
 
 # Another face this large relative to the main face means the photo shows two people
 SECOND_FACE_AREA_RATIO = 0.30
+MAX_EYE_TILT_DEGREES = 25.0
 
 
 @dataclass(frozen=True)
@@ -41,63 +46,53 @@ class QualityLimits:
     min_brightness: float
     max_brightness: float
     max_side_imbalance: float
-    max_eye_offset: float
+    max_nose_offset: float
 
 
 # The registered photo is used for every later match, so it has the stricter limits
 REGISTRATION_LIMITS = QualityLimits(
-    min_face_px=100,
-    min_sharpness=100.0,
+    min_face_px=90,
+    min_sharpness=60.0,
     min_brightness=60.0,
     max_brightness=200.0,
     max_side_imbalance=0.25,
-    max_eye_offset=0.08,
+    max_nose_offset=0.15,
 )
 DETECTION_LIMITS = QualityLimits(
-    min_face_px=80,
-    min_sharpness=60.0,
+    min_face_px=70,
+    min_sharpness=40.0,
     min_brightness=45.0,
     max_brightness=220.0,
     max_side_imbalance=0.35,
-    max_eye_offset=0.12,
+    max_nose_offset=0.25,
 )
 
-# Paths to Haar Cascades
+# Path to the YuNet face detection model
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
-FACE_CASCADE_PATH = os.path.join(MODELS_DIR, "haarcascade_frontalface_default.xml")
-EYE_CASCADE_PATH = os.path.join(MODELS_DIR, "haarcascade_eye.xml")
+FACE_DETECTOR_PATH = os.path.join(MODELS_DIR, "face_detection_yunet_2023mar.onnx")
 
-_face_cascade: Optional[cv2.CascadeClassifier] = None
-_eye_cascade: Optional[cv2.CascadeClassifier] = None
+_face_detector: Optional[cv2.FaceDetectorYN] = None
 
 # In-memory feature cache for registered users: {image_name: features_dict}
 _feature_cache: Dict[str, Dict[str, Any]] = {}
 
 
-def get_face_cascade() -> cv2.CascadeClassifier:
-    global _face_cascade
-    if _face_cascade is None:
-        if not os.path.exists(FACE_CASCADE_PATH):
+def get_face_detector() -> cv2.FaceDetectorYN:
+    global _face_detector
+    if _face_detector is None:
+        if not os.path.exists(FACE_DETECTOR_PATH):
             raise FileNotFoundError(
-                f"Haar face cascade not found at {FACE_CASCADE_PATH}. Run download_models.py."
+                f"YuNet face detector not found at {FACE_DETECTOR_PATH}. Run download_models.py."
             )
-        _face_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
-        if _face_cascade.empty():
-            raise RuntimeError(f"Failed to load Haar face cascade from {FACE_CASCADE_PATH}.")
-    return _face_cascade
-
-
-def get_eye_cascade() -> cv2.CascadeClassifier:
-    global _eye_cascade
-    if _eye_cascade is None:
-        if not os.path.exists(EYE_CASCADE_PATH):
-            raise FileNotFoundError(
-                f"Haar eye cascade not found at {EYE_CASCADE_PATH}. Run download_models.py."
-            )
-        _eye_cascade = cv2.CascadeClassifier(EYE_CASCADE_PATH)
-        if _eye_cascade.empty():
-            raise RuntimeError(f"Failed to load Haar eye cascade from {EYE_CASCADE_PATH}.")
-    return _eye_cascade
+        _face_detector = cv2.FaceDetectorYN.create(
+            FACE_DETECTOR_PATH,
+            "",
+            (320, 320),
+            DETECTION_SCORE_THRESHOLD,
+            DETECTION_NMS_THRESHOLD,
+            DETECTION_TOP_K,
+        )
+    return _face_detector
 
 
 def decode_image(image_bytes: bytes) -> np.ndarray:
@@ -109,10 +104,47 @@ def decode_image(image_bytes: bytes) -> np.ndarray:
     return img
 
 
-def _has_second_face(faces: List[Tuple[int, int, int, int]]) -> bool:
-    """Checks for another large face outside the main face. `faces` is sorted largest first."""
-    x, y, w, h = faces[0]
-    for fx, fy, fw, fh in faces[1:]:
+def _detect_faces(img: np.ndarray) -> List[Dict[str, Any]]:
+    """
+    Runs YuNet and returns faces largest first, in original image coordinates.
+    Each has a box clipped to the image and landmarks ordered by image position:
+    eyes left to right, nose tip, then mouth corners left to right.
+    """
+    h_img, w_img = img.shape[:2]
+    scale = min(1.0, MAX_DETECTION_SIDE / max(h_img, w_img))
+    small = img
+    if scale < 1.0:
+        small = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+    detector = get_face_detector()
+    detector.setInputSize((small.shape[1], small.shape[0]))
+    _, detections = detector.detect(small)
+    if detections is None:
+        return []
+
+    faces: List[Dict[str, Any]] = []
+    for detection in detections:
+        values = detection[:14] / scale
+        x, y = max(0, int(values[0])), max(0, int(values[1]))
+        w = min(w_img - x, int(values[0] + values[2]) - x)
+        h = min(h_img - y, int(values[1] + values[3]) - y)
+        if w <= 0 or h <= 0:
+            continue
+
+        points = values[4:14].reshape(5, 2).astype(np.float64)
+        eyes = points[np.argsort(points[:2, 0])]
+        mouth = points[3:][np.argsort(points[3:, 0])]
+        landmarks = np.vstack([eyes, points[2:3], mouth])
+        faces.append({"box": (x, y, w, h), "landmarks": landmarks})
+
+    faces.sort(key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+    return faces
+
+
+def _has_second_face(boxes: List[Tuple[int, int, int, int]]) -> bool:
+    """Checks for another large face outside the main face. `boxes` is sorted largest first."""
+    x, y, w, h = boxes[0]
+    for fx, fy, fw, fh in boxes[1:]:
         center_x, center_y = fx + fw / 2, fy + fh / 2
         inside_main_face = x <= center_x <= x + w and y <= center_y <= y + h
         if not inside_main_face and fw * fh >= SECOND_FACE_AREA_RATIO * w * h:
@@ -120,64 +152,10 @@ def _has_second_face(faces: List[Tuple[int, int, int, int]]) -> bool:
     return False
 
 
-def _find_eye_pair(
-    gray: np.ndarray, box: Tuple[int, int, int, int]
-) -> Optional[List[List[int]]]:
-    """
-    Finds the most believable pair of eyes in the upper 60% of the face,
-    returned left to right in full-image coordinates. Starts with the most
-    confident detector settings and only relaxes them if no valid pair is found.
-    """
-    x, y, w, h = box
-    roi = gray[y : y + int(h * 0.60), x : x + w]
-    eye_cascade = get_eye_cascade()
-
-    attempts = [(roi, 1), (cv2.equalizeHist(roi), 1)]
-    if w < SMALL_FACE_PX:
-        enlarged = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-        attempts += [(enlarged, 2), (cv2.equalizeHist(enlarged), 2)]
-
-    for (image, scale), min_neighbors in itertools.product(attempts, (3, 2, 1)):
-        min_eye = (int(w * scale * MIN_EYE_SIZE_RATIO), int(h * scale * MIN_EYE_SIZE_RATIO))
-        found = eye_cascade.detectMultiScale(
-            image, scaleFactor=1.1, minNeighbors=min_neighbors, minSize=min_eye
-        )
-        eyes = np.asarray(found, dtype=np.float64) / scale
-        best_score = float("inf")
-        best_pair = None
-        for first, second in itertools.combinations(eyes, 2):
-            left, right = sorted((first, second), key=lambda e: e[0])
-            lx, ly = left[0] + left[2] / 2, left[1] + left[3] / 2
-            rx, ry = right[0] + right[2] / 2, right[1] + right[3] / 2
-            dx, dy = rx - lx, ry - ly
-            if dx <= 0:
-                continue
-
-            tilt = abs(math.degrees(math.atan2(dy, dx)))
-            offset = abs((lx + rx) / 2 - w / 2) / w
-            size_ratio = max(left[2], right[2]) / min(left[2], right[2])
-            if (
-                not MIN_EYE_DISTANCE_RATIO <= dx / w <= MAX_EYE_DISTANCE_RATIO
-                or tilt > MAX_EYE_TILT_DEGREES
-                or size_ratio > MAX_EYE_SIZE_RATIO
-                or offset > MAX_EYE_PAIR_OFFSET
-            ):
-                continue
-
-            # Prefer the pair most centered in the face and closest to level
-            score = offset + abs(dy) / dx
-            if score < best_score:
-                best_score = score
-                best_pair = [[int(x + lx), int(y + ly)], [int(x + rx), int(y + ry)]]
-        if best_pair:
-            return best_pair
-    return None
-
-
 def _check_quality(
     gray: np.ndarray,
     box: Tuple[int, int, int, int],
-    eyes: List[List[int]],
+    landmarks: np.ndarray,
     limits: QualityLimits,
 ) -> None:
     """Rejects photos likely to match badly, with a message saying how to fix them."""
@@ -205,21 +183,28 @@ def _check_quality(
     if imbalance > limits.max_side_imbalance:
         raise ValueError("One side of your face is in shadow. Face the light and try again.")
 
-    eye_center_x = (eyes[0][0] + eyes[1][0]) / 2
-    if abs(eye_center_x - (x + w / 2)) / w > limits.max_eye_offset:
+    # A turned head moves the nose away from the middle of the eyes
+    (lx, ly), (rx, ry), (nose_x, _) = landmarks[0], landmarks[1], landmarks[2]
+    eye_distance = max(math.hypot(rx - lx, ry - ly), 1.0)
+    nose_offset = abs(nose_x - (lx + rx) / 2) / eye_distance
+    tilt = abs(math.degrees(math.atan2(ry - ly, rx - lx)))
+    if nose_offset > limits.max_nose_offset or tilt > MAX_EYE_TILT_DEGREES:
         raise ValueError("Your head is turned. Look straight at the camera and try again.")
 
 
-def _align_face_to_eyes(gray: np.ndarray, eyes: List[List[int]]) -> np.ndarray:
-    """Rotates, scales, and shifts the image so the eyes land on fixed pixels, then crops."""
-    (lx, ly), (rx, ry) = eyes
-    angle = math.degrees(math.atan2(ry - ly, rx - lx))
-    scale = ALIGN_WORK_SIZE * EYE_DISTANCE_RATIO / math.hypot(rx - lx, ry - ly)
-    center = ((lx + rx) / 2.0, (ly + ry) / 2.0)
+def _align_face(gray: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
+    """
+    Rotates, scales, and shifts the image so the five landmarks best fit
+    LANDMARK_TEMPLATE, using a least-squares fit, then crops to the face.
+    """
+    target = LANDMARK_TEMPLATE * ALIGN_WORK_SIZE
 
-    matrix = cv2.getRotationMatrix2D(center, angle, scale)
-    matrix[0, 2] += ALIGN_WORK_SIZE / 2 - center[0]
-    matrix[1, 2] += ALIGN_WORK_SIZE * EYE_Y_RATIO - center[1]
+    # Solves x' = a*x - b*y + tx and y' = b*x + a*y + ty for all landmarks
+    equations = np.zeros((10, 4), dtype=np.float64)
+    equations[0::2] = np.column_stack([landmarks[:, 0], -landmarks[:, 1], np.ones(5), np.zeros(5)])
+    equations[1::2] = np.column_stack([landmarks[:, 1], landmarks[:, 0], np.zeros(5), np.ones(5)])
+    a, b, tx, ty = np.linalg.lstsq(equations, target.ravel(), rcond=None)[0]
+    matrix = np.array([[a, -b, tx], [b, a, ty]], dtype=np.float64)
 
     warped = cv2.warpAffine(
         gray,
@@ -237,56 +222,34 @@ def detect_and_align_face(
 ) -> Tuple[np.ndarray, List[int], List[List[int]]]:
     """
     Pipeline Steps 1, 2, 3:
-    1. Detect face using Haar cascade, select largest face, and check photo quality.
-    2. Align face so both eyes land on the same pixels in every photo.
+    1. Detect faces and landmarks using YuNet, select largest face, and check photo quality.
+    2. Align face so its five landmarks land on the same spots in every photo.
     3. Normalize: 128x128 grayscale with CLAHE.
-    Pass limits=None to skip the quality checks. Both eyes are always required.
+    Pass limits=None to skip the quality checks.
     """
+    faces = _detect_faces(img)
+    if not faces:
+        raise ValueError("No face detected. Please face the camera directly.")
+
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    face_cascade = get_face_cascade()
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=4,
-        minSize=(MIN_FACE_SIZE_PX, MIN_FACE_SIZE_PX),
-    )
-
-    if len(faces) == 0:
-        raise ValueError("No face detected by Haar cascade. Please face the camera directly.")
-
-    # 1. Use the largest face
-    faces = sorted(
-        ([int(v) for v in face] for face in faces),
-        key=lambda f: f[2] * f[3],
-        reverse=True,
-    )
-    x, y, w, h = faces[0]
+    box, landmarks = faces[0]["box"], faces[0]["landmarks"]
 
     if limits:
-        if _has_second_face(faces):
+        if _has_second_face([face["box"] for face in faces]):
             raise ValueError("More than one face found. Only one person should be in the photo.")
-        if min(w, h) < limits.min_face_px:
+        if min(box[2], box[3]) < limits.min_face_px:
             raise ValueError("Face is too small. Move closer to the camera and try again.")
+        _check_quality(gray, box, landmarks, limits)
 
-    # 2. Eye-based alignment
-    eyes = _find_eye_pair(gray, (x, y, w, h))
-    if eyes is None:
-        raise ValueError(
-            "Could not find both eyes. Look straight at the camera and remove any sunglasses."
-        )
+    aligned = _align_face(gray, landmarks)
 
-    if limits:
-        _check_quality(gray, (x, y, w, h), eyes, limits)
-
-    aligned = _align_face_to_eyes(gray, eyes)
-
-    # 3. CLAHE for illumination invariance
+    # CLAHE for illumination invariance
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     norm_face = clahe.apply(aligned)
 
+    x, y, w, h = box
     bbox = [x, y, x + w, y + h]
-    return norm_face, bbox, eyes
+    return norm_face, bbox, [[int(px), int(py)] for px, py in landmarks]
 
 
 def extract_features_from_normalized(norm_face: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -338,19 +301,19 @@ def extract_classical_face_data(
 ) -> Dict[str, Any]:
     """
     End-to-end extraction from raw bytes:
-    Decoding -> Haar Detect -> Quality Checks -> Eye Alignment -> 128x128 CLAHE -> LBP + HOG.
+    Decoding -> YuNet Detect -> Quality Checks -> Landmark Alignment -> 128x128 CLAHE -> LBP + HOG.
     """
     img = decode_image(image_bytes)
 
     h_img, w_img = img.shape[:2]
-    norm_face, bbox, eyes_kps = detect_and_align_face(img, limits)
+    norm_face, bbox, landmarks = detect_and_align_face(img, limits)
     lbp_feat, hog_feat = extract_features_from_normalized(norm_face)
 
     return {
         "lbp": lbp_feat,
         "hog": hog_feat,
         "bbox": bbox,
-        "kps": eyes_kps,
+        "kps": landmarks,
         "image_dimensions": {"width": int(w_img), "height": int(h_img)},
     }
 
@@ -412,7 +375,7 @@ def get_cached_features_for_image(
     try:
         with open(img_path, "rb") as f:
             data = f.read()
-        # This portrait is already registered, so only the alignment has to succeed
+        # This portrait is already registered, so only detection has to succeed
         feats = extract_classical_face_data(data, limits=None)
         _feature_cache[image_name] = {"lbp": feats["lbp"], "hog": feats["hog"]}
         return _feature_cache[image_name]

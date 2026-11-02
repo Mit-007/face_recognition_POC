@@ -14,7 +14,9 @@ Dataset layouts:
     photos/alice-1.jpg, photos/alice-2.jpg, photos/bob-1.jpg   (name-number filenames)
 """
 import argparse
+import itertools
 import json
+import math
 import os
 import re
 import subprocess
@@ -34,7 +36,6 @@ from classical_face_service import (
     CELL_SIZE,
     DETECTION_LIMITS,
     GRID_SIZE,
-    MIN_FACE_SIZE_PX,
     REGISTRATION_LIMITS,
     TARGET_SIZE,
     compare_classical_features,
@@ -42,8 +43,6 @@ from classical_face_service import (
     detect_and_align_face,
     extract_classical_face_data,
     extract_features_from_normalized,
-    get_eye_cascade,
-    get_face_cascade,
 )
 
 load_dotenv()
@@ -152,49 +151,80 @@ def _distance_current_app(a: Features, b: Features) -> float:
     return compare_classical_features(a, b)["final_distance"]
 
 
-def _describe_eye_align_only(image_bytes: bytes) -> Features:
+def _describe_yunet_no_checks(image_bytes: bytes) -> Features:
     norm_face, _, _ = detect_and_align_face(decode_image(image_bytes), limits=None)
     lbp, hog_feature = extract_features_from_normalized(norm_face)
     return {"lbp": lbp, "hog": hog_feature, "eyes_found": True}
 
 
-def _describe_before_alignment_change(image_bytes: bytes) -> Features:
-    """Frozen copy of the old pipeline: whole-image blur check, then a crop from the Haar box."""
-    img = decode_image(image_bytes)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    if cv2.Laplacian(gray, cv2.CV_64F).var() < 5.0:
-        raise ValueError("Image is too blurry.")
+def _find_haar_eye_pair(
+    gray: np.ndarray, box: Tuple[int, int, int, int], eye_cascade: cv2.CascadeClassifier
+) -> Optional[Tuple[Tuple[float, float], Tuple[float, float]]]:
+    x, y, w, h = box
+    roi = gray[y : y + int(h * 0.60), x : x + w]
+    attempts = [(roi, 1), (cv2.equalizeHist(roi), 1)]
+    if w < 200:
+        enlarged = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        attempts += [(enlarged, 2), (cv2.equalizeHist(enlarged), 2)]
 
-    faces = get_face_cascade().detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=4, minSize=(MIN_FACE_SIZE_PX, MIN_FACE_SIZE_PX)
-    )
+    for (image, scale), neighbors in itertools.product(attempts, (3, 2, 1)):
+        found = eye_cascade.detectMultiScale(
+            image, scaleFactor=1.1, minNeighbors=neighbors, minSize=(int(w * scale * 0.08), int(h * scale * 0.08))
+        )
+        best_score, best_pair = float("inf"), None
+        for first, second in itertools.combinations(np.asarray(found, dtype=np.float64) / scale, 2):
+            left, right = sorted((first, second), key=lambda e: e[0])
+            lx, ly = left[0] + left[2] / 2, left[1] + left[3] / 2
+            rx, ry = right[0] + right[2] / 2, right[1] + right[3] / 2
+            dx, dy = rx - lx, ry - ly
+            if dx <= 0:
+                continue
+            offset = abs((lx + rx) / 2 - w / 2) / w
+            if (
+                not 0.25 <= dx / w <= 0.65
+                or abs(math.degrees(math.atan2(dy, dx))) > 25.0
+                or max(left[2], right[2]) / min(left[2], right[2]) > 1.6
+                or offset > 0.25
+            ):
+                continue
+            score = offset + abs(dy) / dx
+            if score < best_score:
+                best_score, best_pair = score, ((x + lx, y + ly), (x + rx, y + ry))
+        if best_pair:
+            return best_pair
+    return None
+
+
+def _describe_haar_previous(image_bytes: bytes) -> Features:
+    """Frozen copy of the previous detector, without photo checks: Haar face and eyes, eye alignment."""
+    gray = cv2.cvtColor(decode_image(image_bytes), cv2.COLOR_BGR2GRAY)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
+
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30))
     if len(faces) == 0:
-        raise ValueError("No face detected.")
-    x, y, w, h = [int(v) for v in max(faces, key=lambda f: f[2] * f[3])]
+        raise ValueError("No face detected by Haar cascade.")
+    box = tuple(int(v) for v in max(faces, key=lambda f: f[2] * f[3]))
 
-    eyes = get_eye_cascade().detectMultiScale(
-        gray[y : y + int(h * 0.60), x : x + w],
-        scaleFactor=1.1,
-        minNeighbors=3,
-        minSize=(int(w * 0.12), int(h * 0.12)),
+    eyes = _find_haar_eye_pair(gray, box, eye_cascade)
+    if eyes is None:
+        raise ValueError("Could not find both eyes with Haar cascade.")
+    (lx, ly), (rx, ry) = eyes
+
+    work_size = 256
+    center = ((lx + rx) / 2.0, (ly + ry) / 2.0)
+    matrix = cv2.getRotationMatrix2D(
+        center, math.degrees(math.atan2(ry - ly, rx - lx)), work_size * 0.40 / math.hypot(rx - lx, ry - ly)
     )
-    if len(eyes) >= 2:
-        ordered = sorted(eyes, key=lambda e: e[0])
-        e1, e2 = ordered[0], ordered[-1]
-        cx1, cy1 = int(x + e1[0] + e1[2] // 2), int(y + e1[1] + e1[3] // 2)
-        cx2, cy2 = int(x + e2[0] + e2[2] // 2), int(y + e2[1] + e2[3] // 2)
-        angle = float(np.degrees(np.arctan2(cy2 - cy1, cx2 - cx1)))
-        if abs(angle) < 40.0:
-            center = (float(cx1 + cx2) / 2.0, float(cy1 + cy2) / 2.0)
-            matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-            gray = cv2.warpAffine(
-                gray, matrix, gray.shape[::-1], flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
-            )
-
-    resized = cv2.resize(gray[y : y + h, x : x + w], TARGET_SIZE, interpolation=cv2.INTER_AREA)
-    norm_face = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(resized)
+    matrix[0, 2] += work_size / 2 - center[0]
+    matrix[1, 2] += work_size * 0.36 - center[1]
+    warped = cv2.warpAffine(
+        gray, matrix, (work_size, work_size), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE
+    )
+    aligned = cv2.resize(warped, TARGET_SIZE, interpolation=cv2.INTER_AREA)
+    norm_face = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(aligned)
     lbp, hog_feature = extract_features_from_normalized(norm_face)
-    return {"lbp": lbp, "hog": hog_feature, "eyes_found": len(eyes) >= 2}
+    return {"lbp": lbp, "hog": hog_feature, "eyes_found": True}
 
 
 @dataclass(frozen=True)
@@ -208,20 +238,20 @@ class Approach:
 
 APPROACHES: List[Approach] = [
     Approach(
-        "before_change",
-        "Old pipeline, for comparison: Haar box crop and whole-image blur check",
-        _describe_before_alignment_change,
+        "haar_previous",
+        "Previous detector, for comparison: Haar face and eyes, eye alignment, no photo checks",
+        _describe_haar_previous,
         _distance_current_app,
     ),
     Approach(
-        "eye_align_only",
-        "New eye alignment without the photo quality checks",
-        _describe_eye_align_only,
+        "yunet_no_checks",
+        "YuNet and landmark alignment without the photo quality checks",
+        _describe_yunet_no_checks,
         _distance_current_app,
     ),
     Approach(
         "current_app",
-        "The code the app runs today: photo checks, eye alignment, 0.6 LBP + 0.4 HOG",
+        "The code the app runs today: YuNet, photo checks, landmark alignment, 0.6 LBP + 0.4 HOG",
         _describe_current_app,
         _distance_current_app,
         uses_app_cutoff=True,

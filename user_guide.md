@@ -1,12 +1,12 @@
-# User Guide — Classical Face Recognition (Non-ML)
+# User Guide — Face Recognition (YuNet + LBP + HOG)
 
-Welcome to the **Face Recognition System** (Proof of Concept). This application uses a pure **Classical Computer Vision** approach (LBP + HOG) to register individuals, measure facial feature distances, and return the most similar registered person in real time—with **zero machine learning models, zero neural network weights, and zero cloud vector databases**.
+Welcome to the **Face Recognition System** (Proof of Concept). This application finds faces with a small **YuNet** detector, then uses hand-crafted **LBP + HOG** features to register individuals, measure facial feature distances, and return the most similar registered person in real time—with **no embeddings, no large models, and no cloud vector databases**.
 
 ---
 
 ## 1. System Overview
 
-- **Register New Person**: Captures a live face photo, validates sharpness, locates facial boundaries and eyes with Haar cascades, normalizes lighting using CLAHE, and stores the portrait locally in `database_images/` with cached LBP and HOG descriptors.
+- **Register New Person**: Captures a live face photo, locates the face and its landmarks with YuNet, checks photo quality, normalizes lighting using CLAHE, and stores the portrait locally in `database_images/` with cached LBP and HOG descriptors.
 - **Detect & Rank Mode**: Captures a face from the camera, extracts texture (LBP) and edge (HOG) descriptors, compares them against all registered persons using a calibrated distance metric ($0.6 \times \text{LBP} + 0.4 \times \text{HOG}$), and returns the **most similar person** along with a full database distance ranking list.
 - **Registered Users Catalog**: Dedicated tab displaying all enrolled identities with instant search and one-click removal.
 - **Detection History Log**: Real-time audit log tracking every recognition attempt, distance metrics, resemblance scores, and statuses.
@@ -43,6 +43,7 @@ Keep two terminal windows open:
 ```powershell
 cd D:\face_recognition_POC\backend
 .\venv\Scripts\Activate.ps1
+python download_models.py   # First time only
 uvicorn main:app --reload --port 8000
 ```
 - To use the least memory outside development, run `uvicorn main:app --port 8000 --http h11 --ws none --loop asyncio` instead.
@@ -65,7 +66,7 @@ npm run dev
 2. Enter the person's **First Name** and **Last Name**.
 3. Click **"Open Camera"**, fit your face in the outline with your eyes on the two marks, and click **"Capture Photo"**.
 4. Click **"Register Person"**.
-5. The system checks the photo, aligns the face using both eyes, caches the LBP/HOG descriptors, and saves the portrait locally. A green success alert appears. If the photo fails a check, a message explains how to fix it, such as moving closer or facing the light.
+5. The system checks the photo, aligns the face using its landmarks, caches the LBP/HOG descriptors, and saves the portrait locally. A green success alert appears. If the photo fails a check, a message explains how to fix it, such as moving closer or facing the light.
 
 ---
 

@@ -4,14 +4,10 @@ import urllib.request
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-CASCADES = {
-    "haarcascade_face": {
-        "filename": "haarcascade_frontalface_default.xml",
-        "url": "https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml",
-    },
-    "haarcascade_eye": {
-        "filename": "haarcascade_eye.xml",
-        "url": "https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml",
+MODELS = {
+    "yunet_face_detector": {
+        "filename": "face_detection_yunet_2023mar.onnx",
+        "url": "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
     },
 }
 
@@ -39,7 +35,7 @@ def download_file(url: str, dest_path: str) -> bool:
 
 def main():
     print(f"Target directory: {MODELS_DIR}")
-    for item in CASCADES.values():
+    for item in MODELS.values():
         dest = os.path.join(MODELS_DIR, item["filename"])
         download_file(item["url"], dest)
 
