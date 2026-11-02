@@ -11,12 +11,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from face_service import extract_face_data, get_face_app
+from face_service import extract_face_data, get_detector, get_recognizer
 from pinecone_service import upsert_face, search_face, get_index, delete_face
 from history_service import add_detection_record, get_detection_history, clear_detection_history
 from user_service import add_registered_user, get_registered_users, delete_registered_user
 
-MATCH_SCORE_THRESHOLD: float = float(os.getenv("MATCH_SCORE_THRESHOLD", "0.50"))
+# SFace cosine similarity threshold is typically 0.363
+MATCH_SCORE_THRESHOLD: float = float(os.getenv("MATCH_SCORE_THRESHOLD", "0.363"))
 
 IMAGES_DIR = os.path.join(os.path.dirname(__file__), "database_images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
@@ -24,9 +25,10 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-warm InsightFace and Pinecone on server startup to eliminate cold start
+    # Pre-warm YuNet, SFace, and Pinecone on server startup to eliminate cold start
     try:
-        get_face_app()
+        get_detector()
+        get_recognizer()
         get_index()
     except Exception:
         pass
