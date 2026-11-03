@@ -49,7 +49,7 @@ def add_detection_record(
         "status": status,
         "name": name,
         "score": round(score, 4),
-        "threshold": round(threshold, 2),
+        "threshold": round(threshold, 4),
         "image_name": image_name,
         "latency_ms": round(latency_ms, 1),
         "message": message,

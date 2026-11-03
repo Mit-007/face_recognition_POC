@@ -7,7 +7,7 @@ Welcome to the **Face Recognition System** (Proof of Concept). This application 
 ## 1. System Overview
 
 - **Register New Person**: Captures a live face photo, locates the face and its landmarks with YuNet, checks photo quality, normalizes lighting using CLAHE, and stores the portrait locally in `database_images/` with cached LBP and HOG descriptors.
-- **Detect Mode**: Captures a face from the camera, extracts texture (LBP) and edge (HOG) descriptors, compares them against all registered persons using a distance metric ($0.6 \times \text{LBP} + 0.4 \times \text{HOG}$), and returns **Verified**, **Please retake**, or **Unknown person**.
+- **Detect Mode**: Captures a face from the camera, extracts texture (LBP) and edge (HOG) descriptors, compares them against all registered persons using a distance metric ($0.4 \times \text{LBP} + 0.6 \times \text{HOG}$), and returns **Verified**, **Please retake**, or **Unknown person**.
 - **Registered Users Catalog**: Dedicated tab displaying all enrolled identities with instant search and one-click removal.
 - **Detection History Log**: Real-time audit log tracking every recognition attempt, closest distances, and statuses.
 
@@ -80,7 +80,7 @@ npm run dev
    - **Unknown Person (Red Card)**: The closest person is above the distance limit.
    - Every result shows the closest and second-closest distances, where lower means more alike. These are not percentages or probabilities.
    - Every result also lists all registered people, closest first, with their distance, LBP, HOG, and whether they are within the limit. This is for score analysis, and it shows registered people's names and photos to whoever is scanning.
-5. To tune the result, change `MATCH_DISTANCE_CUTOFF` and `MATCH_CLEAR_WINNER_MARGIN` in `backend/.env` and restart the backend.
+5. To tune the result, change `MATCH_DISTANCE_CUTOFF`, `MATCH_CLEAR_WINNER_MARGIN`, and `MATCH_PERSONAL_LIMIT_FACTOR` in `backend/.env` and restart the backend.
 
 ---
 

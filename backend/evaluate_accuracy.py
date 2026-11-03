@@ -36,6 +36,7 @@ from classical_face_service import (
     CELL_SIZE,
     DETECTION_LIMITS,
     GRID_SIZE,
+    LBP_WEIGHT,
     REGISTRATION_LIMITS,
     TARGET_SIZE,
     compare_classical_features,
@@ -48,8 +49,9 @@ from classical_face_service import (
 load_dotenv()
 
 DEFAULT_DATASET = Path(__file__).resolve().parent.parent / "data_images"
-DEFAULT_CUTOFF = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.07"))
+DEFAULT_CUTOFF = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.055"))
 DEFAULT_MARGIN = float(os.getenv("MATCH_CLEAR_WINNER_MARGIN", "0.004"))
+DEFAULT_FACTOR = float(os.getenv("MATCH_PERSONAL_LIMIT_FACTOR", "1.1"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 RAM_LIMIT_MB = 100.0
 TARGET_FAR = 0.01
@@ -126,7 +128,7 @@ def _describe(
 
 
 def _distance(
-    lbp_weight: float = 0.6,
+    lbp_weight: float = LBP_WEIGHT,
     cell_weights: Optional[np.ndarray] = None,
 ) -> Callable[[Features, Features], float]:
     weights = np.ones(GRID_SIZE * GRID_SIZE, dtype=np.float32) if cell_weights is None else cell_weights
@@ -150,6 +152,13 @@ def _describe_current_app(image_bytes: bytes) -> Features:
 
 def _distance_current_app(a: Features, b: Features) -> float:
     return compare_classical_features(a, b)["final_distance"]
+
+
+def _distance_whole_face(a: Features, b: Features) -> float:
+    """Frozen copy of the previous formula: every box counted, cosine over the whole HOG vector."""
+    lbp_dist = 0.5 * float(np.sum((a["lbp"] - b["lbp"]) ** 2 / (a["lbp"] + b["lbp"] + 1e-7))) / (GRID_SIZE * GRID_SIZE)
+    hog_dist = 1.0 - float(np.dot(a["hog"], b["hog"])) / float(np.linalg.norm(a["hog"]) * np.linalg.norm(b["hog"]) + 1e-7)
+    return round(0.6 * lbp_dist + 0.4 * hog_dist, 4)
 
 
 def _describe_yunet_no_checks(image_bytes: bytes) -> Features:
@@ -251,8 +260,14 @@ APPROACHES: List[Approach] = [
         _distance_current_app,
     ),
     Approach(
+        "whole_face_previous",
+        "Previous formula, for comparison: all 64 boxes counted, cosine over the whole HOG vector",
+        _describe_current_app,
+        _distance_whole_face,
+    ),
+    Approach(
         "current_app",
-        "The code the app runs today: YuNet, photo checks, landmark alignment, 0.6 LBP + 0.4 HOG",
+        "The code the app runs today: YuNet, photo checks, landmark alignment, worst boxes dropped",
         _describe_current_app,
         _distance_current_app,
         uses_app_cutoff=True,
@@ -343,23 +358,26 @@ def _closest_person(
     photos_by_person: Dict[str, List[int]],
     excluded: set,
     enroll: int,
-) -> Optional[Tuple[str, float, float]]:
+) -> Optional[Tuple[str, float, float, float]]:
     """
     Finds the closest person the way the app does, using up to `enroll` photos per person.
-    Returns (person, distance, gap to the second-closest person).
+    Returns (person, distance, gap to the second-closest person, distance from the
+    closest person's enrolled photos to the nearest other person's enrolled photo).
     """
-    scores: List[Tuple[float, str]] = []
+    scores: List[Tuple[float, str, List[int]]] = []
     for person, photos in photos_by_person.items():
         if person in excluded:
             continue
         enrolled = [i for i in photos if i != probe][:enroll]
         if enrolled:
-            scores.append((float(np.min(matrix[probe, enrolled])), person))
+            scores.append((float(np.min(matrix[probe, enrolled])), person, enrolled))
     if not scores:
         return None
-    scores.sort()
+    scores.sort(key=lambda score: score[0])
     gap = scores[1][0] - scores[0][0] if len(scores) > 1 else float("inf")
-    return scores[0][1], scores[0][0], gap
+    others = [i for score in scores[1:] for i in score[2]]
+    nearest_other = float(np.min(matrix[np.ix_(scores[0][2], others)])) if others else float("inf")
+    return scores[0][1], scores[0][0], gap, nearest_other
 
 
 def _identification(
@@ -369,7 +387,12 @@ def _identification(
     enroll: int,
     threshold: float,
     margin: float = 0.0,
+    factor: Optional[float] = None,
 ) -> Dict[str, Any]:
+    def accepted(found: Tuple[str, float, float, float]) -> bool:
+        limit = threshold if factor is None else min(threshold, factor * found[3])
+        return found[1] <= limit and found[2] >= margin
+
     photos_by_person: Dict[str, List[int]] = {}
     for i, person in enumerate(labels):
         photos_by_person.setdefault(person, []).append(i)
@@ -385,13 +408,13 @@ def _identification(
             if found:
                 known_probes += 1
                 closest_correct += found[0] == person
-                accepted_correct += found[0] == person and found[1] <= threshold and found[2] >= margin
+                accepted_correct += found[0] == person and accepted(found)
 
         # This person is not enrolled, so any acceptance is an error
         found = _closest_person(matrix, probe, photos_by_person, partners | {person}, enroll)
         if found:
             unknown_probes += 1
-            unknown_accepted += found[1] <= threshold and found[2] >= margin
+            unknown_accepted += accepted(found)
 
     return {
         "known_probes": known_probes,
@@ -409,6 +432,7 @@ def compute_metrics(
     enroll: int,
     app_cutoff: Optional[float],
     app_margin: float = 0.0,
+    app_factor: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Calculates all accuracy numbers from a symmetric photo-to-photo distance matrix."""
     label_array = np.array(labels)
@@ -451,9 +475,10 @@ def compute_metrics(
         metrics["app_cutoff"] = {
             "cutoff": app_cutoff,
             "margin": app_margin,
+            "factor": app_factor,
             "far": float(np.mean(impostor <= app_cutoff)),
             "frr": float(np.mean(genuine > app_cutoff)),
-            "identification": _identification(matrix, labels, unsure, enroll, app_cutoff, app_margin),
+            "identification": _identification(matrix, labels, unsure, enroll, app_cutoff, app_margin, app_factor),
         }
     return metrics
 
@@ -566,6 +591,7 @@ def run_approach(approach: Approach, args: argparse.Namespace) -> Dict[str, Any]
             args.enroll,
             args.cutoff if approach.uses_app_cutoff else None,
             args.margin,
+            args.factor,
         )
     except ValueError as e:
         summary["error"] = str(e)
@@ -655,7 +681,7 @@ def print_report(all_results: List[Dict[str, Any]], args: argparse.Namespace, ti
         if "app_cutoff" in r:
             app = r["app_cutoff"]
             ident = app["identification"]
-            print(f"\nAPP AS CONFIGURED TODAY ({r['name']}, cutoff {app['cutoff']:.3f}, clear-winner margin {app['margin']:.3f})")
+            print(f"\nAPP AS CONFIGURED TODAY ({r['name']}, cutoff {app['cutoff']:.3f}, clear-winner margin {app['margin']:.3f}, personal limit x{app['factor']})")
             print(f"  Different-people pairs within cutoff: {_pct(app['far'])}")
             print(f"  Same-person pairs outside cutoff:     {_pct(app['frr'])}")
             print(f"  Known person correctly verified: {_pct(ident['correctly_accepted'])}")
@@ -693,6 +719,7 @@ def _run_workers(names: List[str], args: argparse.Namespace, only_photos: Option
             "--enroll", str(args.enroll),
             "--cutoff", str(args.cutoff),
             "--margin", str(args.margin),
+            "--factor", str(args.factor),
         ]
         for a, b in args.unsure_pair:
             command += ["--unsure-pair", a, b]
@@ -711,6 +738,7 @@ def main() -> None:
     parser.add_argument("--enroll", type=int, default=1, help="Registered photos per person")
     parser.add_argument("--cutoff", type=float, default=DEFAULT_CUTOFF, help="Cutoff the app uses")
     parser.add_argument("--margin", type=float, default=DEFAULT_MARGIN, help="Clear-winner margin the app uses")
+    parser.add_argument("--factor", type=float, default=DEFAULT_FACTOR, help="Personal limit factor the app uses")
     parser.add_argument("--approach", action="append", help="Run only this approach (repeatable)")
     parser.add_argument(
         "--unsure-pair",

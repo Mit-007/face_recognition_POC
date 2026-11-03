@@ -13,6 +13,13 @@ cv2.ocl.setUseOpenCL(False)
 GRID_SIZE = 8
 CELL_SIZE = 16  # 128 / 8
 TARGET_SIZE = (128, 128)
+LBP_BINS = 10
+HOG_ORIENTATIONS = 8
+# The worst boxes are ignored, so a shadow or hair can't dominate the distance
+BOXES_KEPT = int(GRID_SIZE * GRID_SIZE * 0.8)
+# Share of the final distance from texture (LBP) and from edges and shape (HOG)
+LBP_WEIGHT = 0.4
+HOG_WEIGHT = 0.6
 
 # YuNet face detector settings
 DETECTION_SCORE_THRESHOLD = 0.7
@@ -34,9 +41,34 @@ LANDMARK_TEMPLATE = np.array(
     dtype=np.float64,
 )
 
-# Another face this large relative to the main face means the photo shows two people
-SECOND_FACE_AREA_RATIO = 0.30
+# Another face at this confidence, at any size, means the photo is invalid. It's
+# above the detection threshold because tiny false detections can score just over that
+SECOND_FACE_SCORE_THRESHOLD = 0.8
 MAX_EYE_TILT_DEGREES = 25.0
+
+# The face box must stay this share of its size away from every photo edge. YuNet shrinks
+# its box to the visible part of a cut-off face, so that box ends up against the edge
+MIN_EDGE_MARGIN = 0.05
+
+# Face areas used by the covering checks, in the 128x128 aligned face: (x0, x1, y0, y1)
+LEFT_EYE_AREA = (26, 50, 38, 54)
+RIGHT_EYE_AREA = (78, 102, 38, 54)
+LEFT_CHEEK_AREA = (22, 40, 62, 76)
+RIGHT_CHEEK_AREA = (88, 106, 62, 76)
+FOREHEAD_AREA = (44, 84, 18, 30)
+NOSE_AREA = (56, 72, 64, 82)
+CHIN_AREA = (44, 84, 108, 124)
+MOUTH_AREA = (44, 84, 92, 112)
+
+# Sunglasses: the brighter eye area is this dark compared with the cheeks. Its bright
+# part is used instead of its average, so a thick glasses frame doesn't look like a dark lens
+MAX_SUNGLASSES_EYE_RATIO = 0.35
+EYE_BRIGHTNESS_PERCENTILE = 75
+# Mask: at least two of these signals must agree, so a beard alone doesn't count
+MASK_SIGNALS_REQUIRED = 2
+MIN_MASK_NOSE_COLOR_DIFFERENCE = 20.0  # The nose area's color differs from the forehead
+MAX_MASK_CHIN_DETAIL = 30.0  # The chin area is unusually smooth, while a beard is rough
+MAX_MASK_LIP_EDGES = 18.0  # The lips have no visible edges
 
 
 @dataclass(frozen=True)
@@ -107,8 +139,9 @@ def decode_image(image_bytes: bytes) -> np.ndarray:
 def _detect_faces(img: np.ndarray) -> List[Dict[str, Any]]:
     """
     Runs YuNet and returns faces largest first, in original image coordinates.
-    Each has a box clipped to the image and landmarks ordered by image position:
-    eyes left to right, nose tip, then mouth corners left to right.
+    Each has a confidence score, a box clipped to the image, whether the face is cut off
+    by the photo edge, and landmarks ordered by image position: eyes left to right,
+    nose tip, then mouth corners left to right.
     """
     h_img, w_img = img.shape[:2]
     scale = min(1.0, MAX_DETECTION_SIDE / max(h_img, w_img))
@@ -135,19 +168,40 @@ def _detect_faces(img: np.ndarray) -> List[Dict[str, Any]]:
         eyes = points[np.argsort(points[:2, 0])]
         mouth = points[3:][np.argsort(points[3:, 0])]
         landmarks = np.vstack([eyes, points[2:3], mouth])
-        faces.append({"box": (x, y, w, h), "landmarks": landmarks})
+
+        margin_x = MIN_EDGE_MARGIN * values[2]
+        margin_y = MIN_EDGE_MARGIN * values[3]
+        box_cut_off = (
+            values[0] < margin_x
+            or values[1] < margin_y
+            or values[0] + values[2] > w_img - margin_x
+            or values[1] + values[3] > h_img - margin_y
+        )
+        landmark_outside = bool(
+            np.any((points[:, 0] < 0) | (points[:, 0] >= w_img) | (points[:, 1] < 0) | (points[:, 1] >= h_img))
+        )
+
+        faces.append(
+            {
+                "box": (x, y, w, h),
+                "landmarks": landmarks,
+                "score": float(detection[14]),
+                "cut_off": bool(box_cut_off) or landmark_outside,
+            }
+        )
 
     faces.sort(key=lambda f: f["box"][2] * f["box"][3], reverse=True)
     return faces
 
 
-def _has_second_face(boxes: List[Tuple[int, int, int, int]]) -> bool:
-    """Checks for another large face outside the main face. `boxes` is sorted largest first."""
-    x, y, w, h = boxes[0]
-    for fx, fy, fw, fh in boxes[1:]:
+def _has_second_face(faces: List[Dict[str, Any]]) -> bool:
+    """Checks for another confident face outside the main face. `faces` is sorted largest first."""
+    x, y, w, h = faces[0]["box"]
+    for face in faces[1:]:
+        fx, fy, fw, fh = face["box"]
         center_x, center_y = fx + fw / 2, fy + fh / 2
         inside_main_face = x <= center_x <= x + w and y <= center_y <= y + h
-        if not inside_main_face and fw * fh >= SECOND_FACE_AREA_RATIO * w * h:
+        if not inside_main_face and face["score"] >= SECOND_FACE_SCORE_THRESHOLD:
             return True
     return False
 
@@ -216,6 +270,41 @@ def _align_face(gray: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
     return cv2.resize(warped, TARGET_SIZE, interpolation=cv2.INTER_AREA)
 
 
+def _check_coverings(img: np.ndarray, landmarks: np.ndarray) -> None:
+    """Rejects a face covered by sunglasses or a mask, by comparing areas of the aligned face."""
+    # Converted after alignment, so only the small face image is processed
+    light, red_color, blue_color = cv2.split(cv2.cvtColor(_align_face(img, landmarks), cv2.COLOR_BGR2YCrCb))
+
+    def area(channel: np.ndarray, bounds: Tuple[int, int, int, int]) -> np.ndarray:
+        x0, x1, y0, y1 = bounds
+        return channel[y0:y1, x0:x1]
+
+    def mean_of(channel: np.ndarray, bounds: Tuple[int, int, int, int]) -> float:
+        return float(area(channel, bounds).mean())
+
+    cheeks = (mean_of(light, LEFT_CHEEK_AREA) + mean_of(light, RIGHT_CHEEK_AREA)) / 2
+    brighter_eye = max(
+        float(np.percentile(area(light, LEFT_EYE_AREA), EYE_BRIGHTNESS_PERCENTILE)),
+        float(np.percentile(area(light, RIGHT_EYE_AREA), EYE_BRIGHTNESS_PERCENTILE)),
+    )
+    if brighter_eye / (cheeks + 1e-7) < MAX_SUNGLASSES_EYE_RATIO:
+        raise ValueError("Please remove your sunglasses and try again.")
+
+    nose_color_difference = math.hypot(
+        mean_of(red_color, NOSE_AREA) - mean_of(red_color, FOREHEAD_AREA),
+        mean_of(blue_color, NOSE_AREA) - mean_of(blue_color, FOREHEAD_AREA),
+    )
+    chin_detail = float(cv2.Laplacian(area(light, CHIN_AREA), cv2.CV_64F).var())
+    lip_edges = float(np.abs(cv2.Sobel(area(light, MOUTH_AREA), cv2.CV_64F, 0, 1, ksize=3)).mean())
+    mask_signals = (
+        int(nose_color_difference > MIN_MASK_NOSE_COLOR_DIFFERENCE)
+        + int(chin_detail < MAX_MASK_CHIN_DETAIL)
+        + int(lip_edges < MAX_MASK_LIP_EDGES)
+    )
+    if mask_signals >= MASK_SIGNALS_REQUIRED:
+        raise ValueError("Please remove your mask or anything covering your mouth and try again.")
+
+
 def detect_and_align_face(
     img: np.ndarray,
     limits: Optional[QualityLimits] = DETECTION_LIMITS,
@@ -235,11 +324,14 @@ def detect_and_align_face(
     box, landmarks = faces[0]["box"], faces[0]["landmarks"]
 
     if limits:
-        if _has_second_face([face["box"] for face in faces]):
+        if _has_second_face(faces):
             raise ValueError("More than one face found. Only one person should be in the photo.")
+        if faces[0]["cut_off"]:
+            raise ValueError("Your full face isn't visible. Move to the center of the frame and try again.")
         if min(box[2], box[3]) < limits.min_face_px:
             raise ValueError("Face is too small. Move closer to the camera and try again.")
         _check_quality(gray, box, landmarks, limits)
+        _check_coverings(img, landmarks)
 
     aligned = _align_face(gray, landmarks)
 
@@ -322,30 +414,28 @@ def compare_classical_features(
     f1: Dict[str, np.ndarray], f2: Dict[str, np.ndarray]
 ) -> Dict[str, float]:
     """
-    Pipeline Step 5:
-    - Chi-square distance for LBP (averaged across 64 cells, scaled to [0, 1]).
-    - Cosine distance for HOG.
-    - Final Distance = 0.6 * LBP + 0.4 * HOG.
+    Pipeline Step 5, comparing the same grid box in both faces:
+    - Chi-square distance for LBP in each box.
+    - Cosine distance for HOG in each box.
+    - For each, averages the closest 80% of the 64 boxes and ignores the rest.
+    - Final Distance = 0.4 * LBP + 0.6 * HOG.
     Smaller distance = more similar.
     """
-    lbp1, lbp2 = f1["lbp"], f2["lbp"]
-    hog1, hog2 = f1["hog"], f2["hog"]
+    lbp1, lbp2 = f1["lbp"].reshape(-1, LBP_BINS), f2["lbp"].reshape(-1, LBP_BINS)
+    hog1, hog2 = f1["hog"].reshape(-1, HOG_ORIENTATIONS), f2["hog"].reshape(-1, HOG_ORIENTATIONS)
 
-    # 1. Chi-square distance for LBP across all 64 cells
-    diff = lbp1 - lbp2
-    denom = lbp1 + lbp2 + 1e-7
-    # Summing 0.5 * (P-Q)^2 / (P+Q) per cell sums to at most 1.0 per cell when disjoint
-    chi2_raw = float(0.5 * np.sum((diff ** 2) / denom))
-    lbp_dist = min(1.0, max(0.0, chi2_raw / float(GRID_SIZE * GRID_SIZE)))
+    # 1. Chi-square distance for LBP: each box is at most 1.0 when disjoint
+    lbp_boxes = 0.5 * np.sum((lbp1 - lbp2) ** 2 / (lbp1 + lbp2 + 1e-7), axis=1)
+    lbp_dist = min(1.0, max(0.0, float(np.sort(lbp_boxes)[:BOXES_KEPT].mean())))
 
     # 2. Cosine distance for HOG: 1.0 - (u . v) / (||u|| * ||v||)
-    dot_prod = float(np.dot(hog1, hog2))
-    norm_prod = float(np.linalg.norm(hog1) * np.linalg.norm(hog2) + 1e-7)
-    cos_sim = dot_prod / norm_prod
-    hog_dist = min(1.0, max(0.0, 1.0 - cos_sim))
+    dot_prods = np.sum(hog1 * hog2, axis=1)
+    norm_prods = np.linalg.norm(hog1, axis=1) * np.linalg.norm(hog2, axis=1) + 1e-7
+    hog_boxes = 1.0 - dot_prods / norm_prods
+    hog_dist = min(1.0, max(0.0, float(np.sort(hog_boxes)[:BOXES_KEPT].mean())))
 
-    # 3. Weighted combination: 0.6 * LBP + 0.4 * HOG
-    final_distance = float(0.6 * lbp_dist + 0.4 * hog_dist)
+    # 3. Weighted combination
+    final_distance = float(LBP_WEIGHT * lbp_dist + HOG_WEIGHT * hog_dist)
     similarity_score = max(0.0, 1.0 - final_distance)
 
     return {
@@ -428,3 +518,14 @@ def rank_candidates(
     # Sort ascending by final distance (smaller distance = more similar)
     ranked_results.sort(key=lambda x: x["final_distance"])
     return ranked_results
+
+
+def nearest_other_distance(ranked: List[Dict[str, Any]], images_dir: str) -> Optional[float]:
+    """Distance from the closest person's registered photo to the nearest other registered photo."""
+    top_features = get_cached_features_for_image(ranked[0]["image_name"], images_dir)
+    distances = []
+    for candidate in ranked[1:]:
+        other_features = get_cached_features_for_image(candidate["image_name"], images_dir)
+        if top_features is not None and other_features is not None:
+            distances.append(compare_classical_features(top_features, other_features)["final_distance"])
+    return min(distances) if distances else None

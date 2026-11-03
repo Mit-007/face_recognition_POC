@@ -18,16 +18,20 @@ from classical_face_service import (
     cache_user_features,
     invalidate_feature_cache,
     get_face_detector,
+    nearest_other_distance,
 )
 from history_service import add_detection_record, get_detection_history, clear_detection_history
 from user_service import add_registered_user, get_registered_users, delete_registered_user
 
 # A face matches when its LBP + HOG distance is at or below this cutoff.
 # Resemblance is 1 - distance, so the score threshold follows from the cutoff.
-MATCH_DISTANCE_CUTOFF: float = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.07"))
+MATCH_DISTANCE_CUTOFF: float = float(os.getenv("MATCH_DISTANCE_CUTOFF", "0.055"))
 MATCH_SCORE_THRESHOLD: float = round(1.0 - MATCH_DISTANCE_CUTOFF, 4)
 # The closest person must also beat the second-closest person by this much
 MATCH_CLEAR_WINNER_MARGIN: float = float(os.getenv("MATCH_CLEAR_WINNER_MARGIN", "0.004"))
+# The distance must also be within this many times the distance from the closest
+# person's registered photo to the nearest other registered person's photo
+MATCH_PERSONAL_LIMIT_FACTOR: float = float(os.getenv("MATCH_PERSONAL_LIMIT_FACTOR", "1.1"))
 
 IMAGES_DIR = os.path.join(os.path.dirname(__file__), "database_images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
@@ -76,6 +80,7 @@ def _no_match_response(message: str, latency_ms: float, face_data: dict | None =
         "score": 0.0,
         "threshold": MATCH_SCORE_THRESHOLD,
         "cutoff": MATCH_DISTANCE_CUTOFF,
+        "limit": MATCH_DISTANCE_CUTOFF,
         "margin": MATCH_CLEAR_WINNER_MARGIN,
         "name": None,
         "image_name": None,
@@ -152,9 +157,9 @@ async def detect_person(file: UploadFile = File(...)):
     2. Aligns the face using its landmarks and normalizes to 128x128 CLAHE grayscale.
     3. Extracts 8x8 grid LBP (texture, 640-d) and HOG (edges, 512-d).
     4. Compares against all registered faces using:
-       Final Distance = 0.6 * ChiSquare(LBP) + 0.4 * Cosine(HOG).
-    5. Verifies the closest person only if they are within the distance cutoff and
-       clearly ahead of the second-closest person.
+       Final Distance = 0.4 * ChiSquare(LBP) + 0.6 * Cosine(HOG).
+    5. Verifies the closest person only if they are within the distance cutoff, within
+       their personal limit, and clearly ahead of the second-closest person.
     6. Returns every registered person's distances, closest first, for score analysis.
     """
     image_bytes = await file.read()
@@ -187,10 +192,16 @@ async def detect_person(file: UploadFile = File(...)):
     similarity = float(best["similarity_score"])
     second_dist = float(ranked[1]["final_distance"]) if len(ranked) > 1 else None
 
-    within_cutoff = final_dist <= MATCH_DISTANCE_CUTOFF
-    # With one registered person there is no second-closest person to compare against
+    # With one registered person there are no other people to compare against,
+    # so only the cutoff applies
+    limit = MATCH_DISTANCE_CUTOFF
+    nearest_other = nearest_other_distance(ranked, IMAGES_DIR)
+    if nearest_other is not None:
+        limit = min(limit, round(MATCH_PERSONAL_LIMIT_FACTOR * nearest_other, 4))
+
+    within_limit = final_dist <= limit
     clear_winner = second_dist is None or second_dist - final_dist >= MATCH_CLEAR_WINNER_MARGIN
-    is_matched = within_cutoff and clear_winner
+    is_matched = within_limit and clear_winner
 
     matched_name = best["name"] if is_matched else None
     matched_image = best["image_name"] if is_matched else None
@@ -199,7 +210,7 @@ async def detect_person(file: UploadFile = File(...)):
         decision = "verified"
         msg = f"Match verified: {matched_name} (Distance: {final_dist:.3f})"
         status_label = "MATCHED"
-    elif within_cutoff:
+    elif within_limit:
         decision = "retake"
         msg = (
             f"Not sure who this is. The two closest registered people are too similar "
@@ -208,7 +219,7 @@ async def detect_person(file: UploadFile = File(...)):
         status_label = "REJECTED"
     else:
         decision = "unknown"
-        msg = f"Unknown person. Distance ({final_dist:.3f}) above cutoff ({MATCH_DISTANCE_CUTOFF:.3f})."
+        msg = f"Unknown person. Distance ({final_dist:.3f}) above limit ({limit:.3f})."
         status_label = "REJECTED"
 
     add_detection_record(
@@ -216,7 +227,7 @@ async def detect_person(file: UploadFile = File(...)):
         status=status_label,
         name=matched_name,
         score=similarity,
-        threshold=MATCH_SCORE_THRESHOLD,
+        threshold=1.0 - limit,
         image_name=matched_image,
         latency_ms=latency_ms,
         message=msg,
@@ -229,6 +240,7 @@ async def detect_person(file: UploadFile = File(...)):
         "score": similarity,
         "threshold": MATCH_SCORE_THRESHOLD,
         "cutoff": MATCH_DISTANCE_CUTOFF,
+        "limit": limit,
         "margin": MATCH_CLEAR_WINNER_MARGIN,
         "final_distance": final_dist,
         "second_distance": second_dist,

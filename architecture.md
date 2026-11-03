@@ -32,7 +32,7 @@ flowchart TD
             LandmarkAlign["2. Landmark Alignment\nEyes, Nose, and Mouth Corners to Fixed Spots via cv2.warpAffine()"]
             Normalize["3. Normalization\n128x128 Grayscale -> CLAHE"]
             FeatExtract["4. Hand-Crafted Feature Extraction\n- LBP (8x8 Grid -> 640-dim Texture Vector)\n- HOG (8 Bins, 16px Cell -> 512-dim Edge Vector)"]
-            Distance["5. Dual Metric Distance Engine\n- LBP: Chi-Square Distance\n- HOG: Cosine Distance\n- Final Distance = 0.6*LBP + 0.4*HOG"]
+            Distance["5. Dual Metric Distance Engine\n- LBP: Chi-Square Distance\n- HOG: Cosine Distance\n- Final Distance = 0.4*LBP + 0.6*HOG"]
             Ranker["6. Database Distance Ranker\nCompare against all registered faces -> Apply cutoff and clear-winner rule"]
         end
         
@@ -104,7 +104,7 @@ D:\face_recognition_POC\
 
 When a user is enrolled:
 1. Detects the face and its five landmarks using YuNet.
-2. Applies the strict registration photo checks: one person, face size, brightness, sharpness, even lighting, and a straight-on pose. A failed check returns a message saying how to fix the photo.
+2. Applies the strict registration photo checks: one person, a full face inside the photo, face size, brightness, sharpness, even lighting, a straight-on pose, and no sunglasses or mask. A failed check returns a message saying how to fix the photo.
 3. Warps the face so its landmarks best fit fixed spots and normalizes to a standard **$128 \times 128$ CLAHE** grayscale patch.
 4. Extracts 640-d LBP texture features and 512-d HOG shape features.
 5. Saves the reference JPEG to `backend/database_images/{person_id}.jpg`.
@@ -117,14 +117,14 @@ When an identity verification scan is performed:
 1. Captures one photo from the webcam.
 2. Applies the same photo checks with more lenient detection limits, then extracts landmark-aligned 128×128 LBP and HOG descriptors.
 3. Compares the query against **every registered face** in the database:
-   - Computes Chi-Square distance on LBP: $\text{dist}_{\text{LBP}}$
-   - Computes Cosine distance on HOG: $\text{dist}_{\text{HOG}}$
-   - Calculates weighted distance: $\mathbf{\text{Distance} = 0.6 \times \text{LBP} + 0.4 \times \text{HOG}}$
+   - Computes Chi-Square distance on LBP for each grid box, and averages the closest 80% of boxes: $\text{dist}_{\text{LBP}}$
+   - Computes Cosine distance on HOG for each grid box, and averages the closest 80% of boxes: $\text{dist}_{\text{HOG}}$
+   - Calculates weighted distance: $\mathbf{\text{Distance} = 0.4 \times \text{LBP} + 0.6 \times \text{HOG}}$
 4. Ranks all candidates ascending by distance (closest first).
-5. Makes a decision. Both limits are set in `backend/.env`:
-   - **Verified**: the closest distance is within `MATCH_DISTANCE_CUTOFF` and at least `MATCH_CLEAR_WINNER_MARGIN` below the second-closest. The clear-winner rule is skipped when only one person is registered.
-   - **Please retake**: within the cutoff, but the two closest people are too similar.
-   - **Unknown person**: above the cutoff.
+5. Makes a decision. The closest person's limit is the lower of `MATCH_DISTANCE_CUTOFF` and a personal limit, which is `MATCH_PERSONAL_LIMIT_FACTOR` times the distance from their registered photo to the nearest other registered photo. All three values are set in `backend/.env`:
+   - **Verified**: the closest distance is within the limit and at least `MATCH_CLEAR_WINNER_MARGIN` below the second-closest. Only the cutoff applies when one person is registered.
+   - **Please retake**: within the limit, but the two closest people are too similar.
+   - **Unknown person**: above the limit.
    Every scan also returns all registered people's names, portraits, and distances, closest first, for score analysis.
 6. Records the audit event in `detection_history.json`.
 

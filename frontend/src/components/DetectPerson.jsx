@@ -98,7 +98,7 @@ export default function DetectPerson({ onNavigateHistory }) {
             {result.final_distance !== undefined && (
               <div className="classical-chips">
                 <span className="classical-chip">
-                  Closest Distance: <strong>{result.final_distance.toFixed(3)}</strong> (limit {result.cutoff.toFixed(3)})
+                  Closest Distance: <strong>{result.final_distance.toFixed(3)}</strong> (limit {result.limit.toFixed(3)})
                 </span>
                 {result.second_distance !== null && (
                   <span className="classical-chip">
@@ -158,7 +158,7 @@ export default function DetectPerson({ onNavigateHistory }) {
                           <td><strong>{candidate.final_distance.toFixed(3)}</strong></td>
                           <td>{candidate.lbp_distance.toFixed(3)}</td>
                           <td>{candidate.hog_distance.toFixed(3)}</td>
-                          <td>{candidate.final_distance <= result.cutoff ? "Yes" : "No"}</td>
+                          <td>{candidate.final_distance <= result.limit ? "Yes" : "No"}</td>
                         </tr>
                       ))}
                     </tbody>
