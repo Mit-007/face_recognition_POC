@@ -2,6 +2,8 @@
 
 Accuracy of the app, and of different LBP, HOG, and grid-box weights, on the `D:\face_test` photos. Tested on 2026-11-03 on temporary copies.
 
+**Later changes on 2026-11-03:** the app now uses a wider crop, blur, LBP radius 2, 8 px HOG, and relative distance, with new limits. This file records the earlier 16 px HOG tests, so its distances and settings no longer match the app. See sections 10 and 11 of `matric.md`.
+
 **Applied on 2026-11-03: LBP 0.4 / HOG 0.6.** Sections 1–5 record the test that led to this change, when the app used LBP 0.6 / HOG 0.4. Section 7 has the results after the change.
 
 ## Current approach

@@ -98,13 +98,16 @@ export default function DetectPerson({ onNavigateHistory }) {
             {result.final_distance !== undefined && (
               <div className="classical-chips">
                 <span className="classical-chip">
-                  Closest Distance: <strong>{result.final_distance.toFixed(3)}</strong> (limit {result.limit.toFixed(3)})
+                  Closest Score: <strong>{result.relative_distance.toFixed(3)}</strong> (limit {result.limit.toFixed(3)})
                 </span>
-                {result.second_distance !== null && (
+                {result.second_relative_distance !== null && (
                   <span className="classical-chip">
-                    Second Closest: <strong>{result.second_distance.toFixed(3)}</strong> (needs a gap of {result.margin.toFixed(3)})
+                    Second Closest: <strong>{result.second_relative_distance.toFixed(3)}</strong> (needs a gap of {result.margin.toFixed(3)})
                   </span>
                 )}
+                <span className="classical-chip">
+                  Distance: <strong>{result.final_distance.toFixed(3)}</strong>
+                </span>
                 <span className="classical-chip">
                   LBP Texture (Chi²): <strong>{result.lbp_distance.toFixed(3)}</strong>
                 </span>
@@ -132,13 +135,17 @@ export default function DetectPerson({ onNavigateHistory }) {
                 <h4 className="comparison-title">
                   All Registered People ({result.ranked_candidates.length}), Closest First
                 </h4>
-                <p className="comparison-hint">Lower distance means more alike. These are not percentages.</p>
+                <p className="comparison-hint">
+                  Score is the distance divided by that person's average distance to the other registered people,
+                  then by this scan's average. Lower means more alike. These are not percentages.
+                </p>
                 <div className="comparison-table-wrap">
                   <table className="comparison-table">
                     <thead>
                       <tr>
                         <th>#</th>
                         <th>Person</th>
+                        <th>Score</th>
                         <th>Distance</th>
                         <th>LBP</th>
                         <th>HOG</th>
@@ -155,10 +162,11 @@ export default function DetectPerson({ onNavigateHistory }) {
                               <span>{candidate.name}</span>
                             </div>
                           </td>
-                          <td><strong>{candidate.final_distance.toFixed(3)}</strong></td>
+                          <td><strong>{candidate.relative_distance.toFixed(3)}</strong></td>
+                          <td>{candidate.final_distance.toFixed(3)}</td>
                           <td>{candidate.lbp_distance.toFixed(3)}</td>
                           <td>{candidate.hog_distance.toFixed(3)}</td>
-                          <td>{candidate.final_distance <= result.limit ? "Yes" : "No"}</td>
+                          <td>{candidate.relative_distance <= result.limit ? "Yes" : "No"}</td>
                         </tr>
                       ))}
                     </tbody>

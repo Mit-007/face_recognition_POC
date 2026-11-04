@@ -17,7 +17,7 @@ export default function Navbar({ tab, setTab }) {
         </div>
       </div>
 
-      <nav className="navbar-tabs">
+      <nav className="navbar-tabs" aria-label="Primary navigation">
         <button
           type="button"
           className={tab === "register" ? "active" : ""}

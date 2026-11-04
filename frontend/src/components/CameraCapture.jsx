@@ -97,9 +97,21 @@ export default function CameraCapture({ captured, onCapture, overlay }) {
   return (
     <div className="camera-box">
       {!captured && !active && (
-        <button type="button" className="camera-btn" onClick={startCamera}>
-          Open Camera
-        </button>
+        <div className="camera-empty-state">
+          <span className="camera-empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4.5 8.5h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 10v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5V10a1.5 1.5 0 0 1 1.5-1.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+              <circle cx="12" cy="13.5" r="3.1" stroke="currentColor" strokeWidth="1.7" />
+            </svg>
+          </span>
+          <div>
+            <strong>Ready to capture</strong>
+            <p>Open your camera and position one face in the guide.</p>
+          </div>
+          <button type="button" className="camera-btn" onClick={startCamera}>
+            Open Camera
+          </button>
+        </div>
       )}
 
       {!captured && active && (

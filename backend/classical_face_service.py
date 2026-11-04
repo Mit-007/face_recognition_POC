@@ -1,6 +1,7 @@
 import math
 import os
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Dict, Any, List, Optional, Tuple
 import cv2
 import numpy as np
@@ -14,9 +15,12 @@ GRID_SIZE = 8
 CELL_SIZE = 16  # 128 / 8
 TARGET_SIZE = (128, 128)
 LBP_BINS = 10
+LBP_RADIUS = 2  # Compares pixels 2 steps apart, which picks up less noise than 1
 HOG_ORIENTATIONS = 8
+HOG_CELL_SIZE = 8  # Smaller than the LBP boxes, to keep the shape of the eyes, nose, and mouth
 # The worst boxes are ignored, so a shadow or hair can't dominate the distance
-BOXES_KEPT = int(GRID_SIZE * GRID_SIZE * 0.8)
+LBP_BOXES_KEPT = int(GRID_SIZE * GRID_SIZE * 0.8)
+HOG_BOXES_KEPT = int((TARGET_SIZE[0] // HOG_CELL_SIZE) ** 2 * 0.8)
 # Share of the final distance from texture (LBP) and from edges and shape (HOG)
 LBP_WEIGHT = 0.4
 HOG_WEIGHT = 0.6
@@ -40,6 +44,11 @@ LANDMARK_TEMPLATE = np.array(
     ],
     dtype=np.float64,
 )
+# Matching uses a slightly wider crop, which includes more of the jaw and face outline.
+# The covering checks stay on LANDMARK_TEMPLATE, because their face areas are measured on it
+MATCH_LANDMARK_TEMPLATE = np.array([0.5, 0.56]) + (LANDMARK_TEMPLATE - np.array([0.5, 0.56])) * 0.9
+# Softens the face before matching, which reduces noise and small lighting differences
+MATCH_BLUR_SIGMA = 1.0
 
 # Another face at this confidence, at any size, means the photo is invalid. It's
 # above the detection threshold because tiny false detections can score just over that
@@ -69,6 +78,15 @@ MASK_SIGNALS_REQUIRED = 2
 MIN_MASK_NOSE_COLOR_DIFFERENCE = 20.0  # The nose area's color differs from the forehead
 MAX_MASK_CHIN_DETAIL = 30.0  # The chin area is unusually smooth, while a beard is rough
 MAX_MASK_LIP_EDGES = 18.0  # The lips have no visible edges
+
+# Hand: both signals must agree. Fingers across the face make strong horizontal edges,
+# and the hand or arm shows skin beyond the face box at mouth height
+FINGER_EDGE_AREA = (30, 98, 64, 124)
+MIN_HAND_FINGER_EDGE_RATIO = 1.6
+MIN_HAND_OUTSIDE_SKIN_SHARE = 0.3
+SKIN_COLOR_TOLERANCE = 8.0
+MIN_SKIN_BRIGHTNESS = 50
+MAX_SKIN_BRIGHTNESS = 240
 
 
 @dataclass(frozen=True)
@@ -107,6 +125,9 @@ _face_detector: Optional[cv2.FaceDetectorYN] = None
 
 # In-memory feature cache for registered users: {image_name: features_dict}
 _feature_cache: Dict[str, Dict[str, Any]] = {}
+
+# Each registered photo's average distance to the others: {image_name: distance}
+_average_distances: Dict[str, float] = {}
 
 
 def get_face_detector() -> cv2.FaceDetectorYN:
@@ -246,12 +267,14 @@ def _check_quality(
         raise ValueError("Your head is turned. Look straight at the camera and try again.")
 
 
-def _align_face(gray: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
+def _align_face(
+    gray: np.ndarray, landmarks: np.ndarray, template: np.ndarray = LANDMARK_TEMPLATE
+) -> np.ndarray:
     """
     Rotates, scales, and shifts the image so the five landmarks best fit
-    LANDMARK_TEMPLATE, using a least-squares fit, then crops to the face.
+    the template, using a least-squares fit, then crops to the face.
     """
-    target = LANDMARK_TEMPLATE * ALIGN_WORK_SIZE
+    target = template * ALIGN_WORK_SIZE
 
     # Solves x' = a*x - b*y + tx and y' = b*x + a*y + ty for all landmarks
     equations = np.zeros((10, 4), dtype=np.float64)
@@ -270,8 +293,36 @@ def _align_face(gray: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
     return cv2.resize(warped, TARGET_SIZE, interpolation=cv2.INTER_AREA)
 
 
-def _check_coverings(img: np.ndarray, landmarks: np.ndarray) -> None:
-    """Rejects a face covered by sunglasses or a mask, by comparing areas of the aligned face."""
+def _outside_skin_share(img: np.ndarray, box: Tuple[int, int, int, int]) -> float:
+    """Share of skin-colored pixels just beside the face box at mouth height, on the fuller side."""
+    x, y, w, h = box
+    forehead = cv2.cvtColor(
+        img[int(y + h * 0.12) : int(y + h * 0.22), int(x + w * 0.35) : int(x + w * 0.65)],
+        cv2.COLOR_BGR2YCrCb,
+    )
+    forehead_cr, forehead_cb = float(forehead[:, :, 1].mean()), float(forehead[:, :, 2].mean())
+
+    top, bottom = int(y + h * 0.6), int(y + h)
+    width = int(w * 0.35)
+    best_share = 0.0
+    for strip in (img[top:bottom, max(0, x - width) : x], img[top:bottom, x + w : x + w + width]):
+        if strip.size == 0:
+            continue
+        brightness, cr, cb = cv2.split(cv2.cvtColor(strip, cv2.COLOR_BGR2YCrCb).astype(np.float32))
+        skin = (
+            (np.abs(cr - forehead_cr) < SKIN_COLOR_TOLERANCE)
+            & (np.abs(cb - forehead_cb) < SKIN_COLOR_TOLERANCE)
+            & (brightness > MIN_SKIN_BRIGHTNESS)
+            & (brightness < MAX_SKIN_BRIGHTNESS)
+        )
+        best_share = max(best_share, float(skin.mean()))
+    return best_share
+
+
+def _check_coverings(
+    img: np.ndarray, box: Tuple[int, int, int, int], landmarks: np.ndarray
+) -> None:
+    """Rejects a face covered by sunglasses, a mask, or a hand, by comparing areas of the aligned face."""
     # Converted after alignment, so only the small face image is processed
     light, red_color, blue_color = cv2.split(cv2.cvtColor(_align_face(img, landmarks), cv2.COLOR_BGR2YCrCb))
 
@@ -304,6 +355,16 @@ def _check_coverings(img: np.ndarray, landmarks: np.ndarray) -> None:
     if mask_signals >= MASK_SIGNALS_REQUIRED:
         raise ValueError("Please remove your mask or anything covering your mouth and try again.")
 
+    finger_area = area(light, FINGER_EDGE_AREA)
+    horizontal_edges = float(np.abs(cv2.Sobel(finger_area, cv2.CV_32F, 0, 1, ksize=3)).mean())
+    vertical_edges = float(np.abs(cv2.Sobel(finger_area, cv2.CV_32F, 1, 0, ksize=3)).mean())
+    finger_edge_ratio = horizontal_edges / (vertical_edges + 1e-7)
+    if (
+        finger_edge_ratio > MIN_HAND_FINGER_EDGE_RATIO
+        and _outside_skin_share(img, box) > MIN_HAND_OUTSIDE_SKIN_SHARE
+    ):
+        raise ValueError("Something is covering your face. Clear your face and try again.")
+
 
 def detect_and_align_face(
     img: np.ndarray,
@@ -313,7 +374,7 @@ def detect_and_align_face(
     Pipeline Steps 1, 2, 3:
     1. Detect faces and landmarks using YuNet, select largest face, and check photo quality.
     2. Align face so its five landmarks land on the same spots in every photo.
-    3. Normalize: 128x128 grayscale with CLAHE.
+    3. Normalize: 128x128 grayscale with CLAHE, then a slight blur.
     Pass limits=None to skip the quality checks.
     """
     faces = _detect_faces(img)
@@ -331,13 +392,13 @@ def detect_and_align_face(
         if min(box[2], box[3]) < limits.min_face_px:
             raise ValueError("Face is too small. Move closer to the camera and try again.")
         _check_quality(gray, box, landmarks, limits)
-        _check_coverings(img, landmarks)
+        _check_coverings(img, box, landmarks)
 
-    aligned = _align_face(gray, landmarks)
+    aligned = _align_face(gray, landmarks, MATCH_LANDMARK_TEMPLATE)
 
     # CLAHE for illumination invariance
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    norm_face = clahe.apply(aligned)
+    norm_face = cv2.GaussianBlur(clahe.apply(aligned), (0, 0), MATCH_BLUR_SIGMA)
 
     x, y, w, h = box
     bbox = [x, y, x + w, y + h]
@@ -350,8 +411,8 @@ def extract_features_from_normalized(norm_face: np.ndarray) -> Tuple[np.ndarray,
     - LBP on an 8x8 grid (local texture, keeps spatial layout).
     - HOG (edge and shape structure).
     """
-    # 1. Uniform LBP (P=8, R=1 -> 10 histogram bins per cell)
-    lbp_map = local_binary_pattern(norm_face, P=8, R=1, method="uniform")
+    # 1. Uniform LBP (P=8, R=2 -> 10 histogram bins per cell)
+    lbp_map = local_binary_pattern(norm_face, P=8, R=LBP_RADIUS, method="uniform")
     cell_hists: List[np.ndarray] = []
 
     for r in range(GRID_SIZE):
@@ -368,11 +429,11 @@ def extract_features_from_normalized(norm_face: np.ndarray) -> Tuple[np.ndarray,
 
     lbp_feature = np.concatenate(cell_hists).astype(np.float32)  # 640-dim vector
 
-    # 2. HOG (8 orientations, 16x16 cell, 1x1 block -> 512-dim vector)
+    # 2. HOG (8 orientations, 8x8 cell, 1x1 block -> 2048-dim vector)
     hog_feature = hog(
         norm_face,
-        orientations=8,
-        pixels_per_cell=(CELL_SIZE, CELL_SIZE),
+        orientations=HOG_ORIENTATIONS,
+        pixels_per_cell=(HOG_CELL_SIZE, HOG_CELL_SIZE),
         cells_per_block=(1, 1),
         block_norm="L2-Hys",
         visualize=False,
@@ -417,7 +478,7 @@ def compare_classical_features(
     Pipeline Step 5, comparing the same grid box in both faces:
     - Chi-square distance for LBP in each box.
     - Cosine distance for HOG in each box.
-    - For each, averages the closest 80% of the 64 boxes and ignores the rest.
+    - For each, averages the closest 80% of the boxes and ignores the rest.
     - Final Distance = 0.4 * LBP + 0.6 * HOG.
     Smaller distance = more similar.
     """
@@ -426,13 +487,13 @@ def compare_classical_features(
 
     # 1. Chi-square distance for LBP: each box is at most 1.0 when disjoint
     lbp_boxes = 0.5 * np.sum((lbp1 - lbp2) ** 2 / (lbp1 + lbp2 + 1e-7), axis=1)
-    lbp_dist = min(1.0, max(0.0, float(np.sort(lbp_boxes)[:BOXES_KEPT].mean())))
+    lbp_dist = min(1.0, max(0.0, float(np.sort(lbp_boxes)[:LBP_BOXES_KEPT].mean())))
 
     # 2. Cosine distance for HOG: 1.0 - (u . v) / (||u|| * ||v||)
     dot_prods = np.sum(hog1 * hog2, axis=1)
     norm_prods = np.linalg.norm(hog1, axis=1) * np.linalg.norm(hog2, axis=1) + 1e-7
     hog_boxes = 1.0 - dot_prods / norm_prods
-    hog_dist = min(1.0, max(0.0, float(np.sort(hog_boxes)[:BOXES_KEPT].mean())))
+    hog_dist = min(1.0, max(0.0, float(np.sort(hog_boxes)[:HOG_BOXES_KEPT].mean())))
 
     # 3. Weighted combination
     final_distance = float(LBP_WEIGHT * lbp_dist + HOG_WEIGHT * hog_dist)
@@ -482,6 +543,21 @@ def invalidate_feature_cache(image_name: Optional[str] = None):
         _feature_cache.clear()
 
 
+def _get_average_distances(references: Dict[str, Dict[str, np.ndarray]]) -> Dict[str, float]:
+    """Each registered photo's average distance to the others, recalculated when the people change."""
+    global _average_distances
+    if len(references) < 2:
+        return {}
+    if _average_distances.keys() != references.keys():
+        totals = dict.fromkeys(references, 0.0)
+        for first, second in combinations(references, 2):
+            distance = compare_classical_features(references[first], references[second])["final_distance"]
+            totals[first] += distance
+            totals[second] += distance
+        _average_distances = {name: total / (len(references) - 1) for name, total in totals.items()}
+    return _average_distances
+
+
 def rank_candidates(
     query_features: Dict[str, np.ndarray],
     registered_users: List[Dict[str, Any]],
@@ -489,25 +565,49 @@ def rank_candidates(
 ) -> List[Dict[str, Any]]:
     """
     Pipeline Step 6:
-    Compare query features against all registered images and rank by distance ascending.
+    Compare query features against all registered images and rank by relative distance ascending.
+    - Distance is first divided by that photo's average distance to the other registered photos,
+      so a photo that looks close to everyone doesn't win most scans.
+    - That is then divided by this scan's average across all registered people, so a scan only
+      passes if one person stands out, which makes strangers easier to reject.
+    With one registered person there's nothing to compare against, so it's the plain distance.
     """
-    ranked_results: List[Dict[str, Any]] = []
-
+    references: Dict[str, Dict[str, np.ndarray]] = {}
+    users_by_image: Dict[str, Dict[str, Any]] = {}
     for user in registered_users:
         img_name = user.get("image_name")
         if not img_name:
             continue
 
         ref_features = get_cached_features_for_image(img_name, images_dir)
-        if ref_features is None:
-            continue
+        if ref_features is not None:
+            references[img_name] = ref_features
+            users_by_image[img_name] = user
 
-        cmp = compare_classical_features(query_features, ref_features)
+    averages = _get_average_distances(references)
+    comparisons = {
+        img_name: compare_classical_features(query_features, ref_features)
+        for img_name, ref_features in references.items()
+    }
+    scan_average = 0.0
+    if averages:
+        scan_average = sum(
+            cmp["final_distance"] / max(averages[img_name], 1e-7) for img_name, cmp in comparisons.items()
+        ) / len(comparisons)
+
+    ranked_results: List[Dict[str, Any]] = []
+
+    for img_name, cmp in comparisons.items():
+        # The value the plain distance is divided by, or None with one registered person
+        divisor = max(averages[img_name], 1e-7) * max(scan_average, 1e-7) if averages else None
+        relative = cmp["final_distance"] if divisor is None else cmp["final_distance"] / divisor
         ranked_results.append(
             {
-                "person_id": user.get("person_id"),
-                "name": user.get("name"),
+                "person_id": users_by_image[img_name].get("person_id"),
+                "name": users_by_image[img_name].get("name"),
                 "image_name": img_name,
+                "relative_distance": round(relative, 4),
+                "distance_divisor": divisor,
                 "final_distance": cmp["final_distance"],
                 "similarity_score": cmp["similarity_score"],
                 "lbp_distance": cmp["lbp_distance"],
@@ -515,17 +615,6 @@ def rank_candidates(
             }
         )
 
-    # Sort ascending by final distance (smaller distance = more similar)
-    ranked_results.sort(key=lambda x: x["final_distance"])
+    # Sort ascending (smaller = more similar)
+    ranked_results.sort(key=lambda x: x["relative_distance"])
     return ranked_results
-
-
-def nearest_other_distance(ranked: List[Dict[str, Any]], images_dir: str) -> Optional[float]:
-    """Distance from the closest person's registered photo to the nearest other registered photo."""
-    top_features = get_cached_features_for_image(ranked[0]["image_name"], images_dir)
-    distances = []
-    for candidate in ranked[1:]:
-        other_features = get_cached_features_for_image(candidate["image_name"], images_dir)
-        if top_features is not None and other_features is not None:
-            distances.append(compare_classical_features(top_features, other_features)["final_distance"])
-    return min(distances) if distances else None

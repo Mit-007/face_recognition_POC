@@ -75,12 +75,12 @@ npm run dev
 2. Click **"Open Camera"**, fit your face in the outline with your eyes on the two marks, and click **"Capture Photo"**. If the photo fails a check, retake it using the message shown.
 3. Click **"Detect Person"**.
 4. The system compares the captured photo against all enrolled portraits:
-   - **Verified (Green Card)**: The closest person is within the distance limit and clearly ahead of the second-closest. Shows their name and reference portrait.
+   - **Verified (Green Card)**: The closest person is within the score limit and clearly ahead of the second-closest. Shows their name and reference portrait.
    - **Please Retake (Red Card)**: The closest person is within the limit, but the second-closest is too near to be sure.
-   - **Unknown Person (Red Card)**: The closest person is above the distance limit.
-   - Every result shows the closest and second-closest distances, where lower means more alike. These are not percentages or probabilities.
-   - Every result also lists all registered people, closest first, with their distance, LBP, HOG, and whether they are within the limit. This is for score analysis, and it shows registered people's names and photos to whoever is scanning.
-5. To tune the result, change `MATCH_DISTANCE_CUTOFF`, `MATCH_CLEAR_WINNER_MARGIN`, and `MATCH_PERSONAL_LIMIT_FACTOR` in `backend/.env` and restart the backend.
+   - **Unknown Person (Red Card)**: The closest person is above the score limit.
+   - Every result shows the closest and second-closest scores. A score is the distance divided by that person's average distance to the other registered people, then by this scan's average, and lower means more alike. These are not percentages or probabilities. With one person registered, the score is the plain distance.
+   - Every result also lists all registered people, closest first, with their score, distance, LBP, HOG, and whether they are within the limit. This is for score analysis, and it shows registered people's names and photos to whoever is scanning.
+5. To tune the result, change `MATCH_RELATIVE_LIMIT`, `MATCH_CLEAR_WINNER_MARGIN`, and `MATCH_DISTANCE_CUTOFF` (used only with one person registered) in `backend/.env` and restart the backend.
 
 ---
 

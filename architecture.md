@@ -30,10 +30,10 @@ flowchart TD
             Decode["cv2.imdecode"]
             FaceDetect["1. Largest Face Detection & Photo Checks\nYuNet (face_detection_yunet_2023mar.onnx)"]
             LandmarkAlign["2. Landmark Alignment\nEyes, Nose, and Mouth Corners to Fixed Spots via cv2.warpAffine()"]
-            Normalize["3. Normalization\n128x128 Grayscale -> CLAHE"]
-            FeatExtract["4. Hand-Crafted Feature Extraction\n- LBP (8x8 Grid -> 640-dim Texture Vector)\n- HOG (8 Bins, 16px Cell -> 512-dim Edge Vector)"]
+            Normalize["3. Normalization\n128x128 Grayscale -> CLAHE -> Slight Blur"]
+            FeatExtract["4. Hand-Crafted Feature Extraction\n- LBP (8x8 Grid -> 640-dim Texture Vector)\n- HOG (8 Bins, 8px Cell -> 2048-dim Edge Vector)"]
             Distance["5. Dual Metric Distance Engine\n- LBP: Chi-Square Distance\n- HOG: Cosine Distance\n- Final Distance = 0.4*LBP + 0.6*HOG"]
-            Ranker["6. Database Distance Ranker\nCompare against all registered faces -> Apply cutoff and clear-winner rule"]
+            Ranker["6. Database Distance Ranker\nCompare against all registered faces -> Relative Distance = Distance / Average distance to others / Scan average -> Apply limit and clear-winner rule"]
         end
         
         DiskStore[("Local Disk Store\nbackend/database_images/")]
@@ -66,7 +66,7 @@ D:\face_recognition_POC\
 │   ├── models\                # Downloaded by download_models.py
 │   │   └── face_detection_yunet_2023mar.onnx    # YuNet face and landmark detector
 │   ├── venv\                  # Python virtual environment
-│   ├── .env                   # Distance cutoff and score thresholds
+│   ├── .env                   # Relative limit, clear-winner margin, and one-person cutoff
 │   ├── .env.example           # Example configuration template
 │   ├── classical_face_service.py # Pure Classical CV detection, photo checks, alignment, LBP & HOG
 │   ├── evaluate_accuracy.py   # Measures accuracy of each matching approach on test photos
@@ -104,9 +104,9 @@ D:\face_recognition_POC\
 
 When a user is enrolled:
 1. Detects the face and its five landmarks using YuNet.
-2. Applies the strict registration photo checks: one person, a full face inside the photo, face size, brightness, sharpness, even lighting, a straight-on pose, and no sunglasses or mask. A failed check returns a message saying how to fix the photo.
-3. Warps the face so its landmarks best fit fixed spots and normalizes to a standard **$128 \times 128$ CLAHE** grayscale patch.
-4. Extracts 640-d LBP texture features and 512-d HOG shape features.
+2. Applies the strict registration photo checks: one person, a full face inside the photo, face size, brightness, sharpness, even lighting, a straight-on pose, and no sunglasses, mask, or hand over the face. A failed check returns a message saying how to fix the photo.
+3. Warps the face so its landmarks best fit fixed spots, using a slightly wider crop than the photo checks, and normalizes to a standard **$128 \times 128$ CLAHE** grayscale patch with a slight blur.
+4. Extracts 640-d LBP texture features and 2048-d HOG shape features.
 5. Saves the reference JPEG to `backend/database_images/{person_id}.jpg`.
 6. Appends identity metadata to `registered_users.json`.
 7. Pre-caches LBP and HOG features in memory (`_feature_cache`) for instant comparisons.
@@ -120,11 +120,14 @@ When an identity verification scan is performed:
    - Computes Chi-Square distance on LBP for each grid box, and averages the closest 80% of boxes: $\text{dist}_{\text{LBP}}$
    - Computes Cosine distance on HOG for each grid box, and averages the closest 80% of boxes: $\text{dist}_{\text{HOG}}$
    - Calculates weighted distance: $\mathbf{\text{Distance} = 0.4 \times \text{LBP} + 0.6 \times \text{HOG}}$
-4. Ranks all candidates ascending by distance (closest first).
-5. Makes a decision. The closest person's limit is the lower of `MATCH_DISTANCE_CUTOFF` and a personal limit, which is `MATCH_PERSONAL_LIMIT_FACTOR` times the distance from their registered photo to the nearest other registered photo. All three values are set in `backend/.env`:
-   - **Verified**: the closest distance is within the limit and at least `MATCH_CLEAR_WINNER_MARGIN` below the second-closest. Only the cutoff applies when one person is registered.
+   - Divides that distance by the person's average distance to the other registered photos, so a photo that looks close to everyone can't win most scans. The averages are recalculated when the registered people change.
+   - Divides the result by this scan's average across all registered people, so a scan only passes if one person stands out: $\text{Relative Distance} = \text{Distance} / \text{Average} / \text{Scan Average}$.
+4. Ranks all candidates ascending by relative distance (closest first).
+5. Makes a decision using `MATCH_RELATIVE_LIMIT` and `MATCH_CLEAR_WINNER_MARGIN`, set in `backend/.env`:
+   - **Verified**: the closest relative distance is within the limit and at least the margin below the second-closest.
    - **Please retake**: within the limit, but the two closest people are too similar.
    - **Unknown person**: above the limit.
+   With one person registered, there are no others to compare against, so the plain distance must be within `MATCH_DISTANCE_CUTOFF`.
    Every scan also returns all registered people's names, portraits, and distances, closest first, for score analysis.
 6. Records the audit event in `detection_history.json`.
 
